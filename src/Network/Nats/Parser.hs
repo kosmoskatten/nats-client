@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Nats.Parser
-    (
+    ( message
     ) where
 
 import Control.Applicative ((<|>))
@@ -20,6 +20,9 @@ data HandshakeMessageValue =
 
 type HandshakeMessageField = (ByteString, HandshakeMessageValue)
 
+message :: Parser Message
+message = infoMessage
+
 -- | The parsing of the info message is not performance critical.
 infoMessage :: Parser Message
 infoMessage = do
@@ -27,15 +30,16 @@ infoMessage = do
     void $ stringCI "info"
     void $ space
     void $ char '{'
-    _fields <- parseInfoMessageFields
+    fields <- parseInfoMessageFields
     void $ char '}'
-    return Info { serverId = "test", serverVersion = "test" }
+    mkInfoMessage fields
 
 parseInfoMessageFields :: Parser [HandshakeMessageField]
 parseInfoMessageFields = infoMessageField `sepBy` (char ',')
     where
       infoMessageField = parseServerId
                      <|> parseServerVersion
+                     <|> parseGoVersion
 
 parseServerId :: Parser HandshakeMessageField
 parseServerId = do
@@ -51,15 +55,37 @@ parseServerVersion = do
     value <- quotedString
     return ("version", String value)
 
+parseGoVersion :: Parser HandshakeMessageField
+parseGoVersion = do
+    void $ string "\"go\""
+    void $ char ':'
+    value <- quotedString
+    return ("go", String value)
+
 quotedString :: Parser ByteString
 quotedString = BS.pack <$> (char '\"' *> manyTill anyChar (char '\"'))
 
 boolean :: Parser Bool
 boolean = string "false" *> return False <|> string "true" *> return True
 
-handshakeFieldWithDefault :: ByteString -> HandshakeMessageValue
-                          -> [HandshakeMessageField] 
-                          -> HandshakeMessageValue
-handshakeFieldWithDefault key def fields =
-    maybe def id $ lookup key fields
+mkInfoMessage :: [HandshakeMessageField] -> Parser Message
+mkInfoMessage fields = do
+    Info <$> (asByteString $ lookup "server_id" fields)
+         <*> (asByteString $ lookup "version" fields)
+         <*> (asByteString $ lookup "go" fields)
+
+asByteString :: Maybe HandshakeMessageValue -> Parser (Maybe ByteString)
+asByteString Nothing               = return Nothing
+asByteString (Just (String value)) = return (Just value)
+asByteString _                     = fail "Expected a ByteString"
+
+asBool :: Maybe HandshakeMessageValue -> Parser (Maybe Bool)
+asBool Nothing             = return Nothing
+asBool (Just (Bool value)) = return (Just value)
+asBool _                   = fail "Expected a boolean"
+
+asInt :: Maybe HandshakeMessageValue -> Parser (Maybe Int)
+asInt Nothing            = return Nothing
+asInt (Just (Int value)) = return (Just value)
+asInt _                  = fail "Expected an Int"
 
