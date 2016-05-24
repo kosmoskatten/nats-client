@@ -5,8 +5,13 @@ module Network.Nats.Message
 import Data.ByteString.Char8 (ByteString)
 
 data Message =
-    Info { serverId      :: !(Maybe ByteString)
-         , serverVersion :: !(Maybe ByteString)
-         , goVersion     :: !(Maybe ByteString)
+    Info { serverId           :: !(Maybe ByteString)
+         , serverVersion      :: !(Maybe ByteString)
+         , goVersion          :: !(Maybe ByteString)
+         , serverHost         :: !(Maybe ByteString)
+         , serverPort         :: !(Maybe Int)
+         , serverAuthRequired :: !(Maybe Bool)
+         , serverSslRequired  :: !(Maybe Bool)
+         , maxPayload         :: !(Maybe Int)
          }
-    deriving Show
+    deriving (Eq, Show)

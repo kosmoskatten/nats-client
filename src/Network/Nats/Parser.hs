@@ -40,27 +40,45 @@ parseInfoMessageFields = infoMessageField `sepBy` (char ',')
       infoMessageField = parseServerId
                      <|> parseServerVersion
                      <|> parseGoVersion
+                     <|> parseServerHost
+                     <|> parseServerPort
+                     <|> parseServerAuthRequired
+                     <|> parseSslRequired
+                     <|> parseMaxPayload
 
 parseServerId :: Parser HandshakeMessageField
-parseServerId = do
-    void $ string "\"server_id\""
-    void $ char ':'
-    value <- quotedString
-    return ("server_id", String value)
+parseServerId = pair "\"server_id\"" quotedString "server_id" String
 
 parseServerVersion :: Parser HandshakeMessageField
-parseServerVersion = do
-    void $ string "\"version\""
-    void $ char ':'
-    value <- quotedString
-    return ("version", String value)
+parseServerVersion = pair "\"version\"" quotedString "version" String
 
 parseGoVersion :: Parser HandshakeMessageField
-parseGoVersion = do
-    void $ string "\"go\""
+parseGoVersion = pair "\"go\"" quotedString "go" String
+
+parseServerHost :: Parser HandshakeMessageField
+parseServerHost = pair "\"host\"" quotedString "host" String
+
+parseServerPort :: Parser HandshakeMessageField
+parseServerPort = pair "\"port\"" decimal "port" Int
+
+parseServerAuthRequired :: Parser HandshakeMessageField
+parseServerAuthRequired = 
+    pair "\"auth_required\"" boolean "auth_required" Bool
+
+parseSslRequired :: Parser HandshakeMessageField
+parseSslRequired = pair "\"ssl_required\"" boolean "ssl_required" Bool
+
+parseMaxPayload :: Parser HandshakeMessageField
+parseMaxPayload = pair "\"max_payload\"" decimal "max_payload" Int
+
+pair :: ByteString -> Parser a -> ByteString 
+               -> (a -> HandshakeMessageValue) 
+               -> Parser HandshakeMessageField
+pair fieldName parser keyName ctor = do
+    void $ string fieldName
     void $ char ':'
-    value <- quotedString
-    return ("go", String value)
+    value <- parser
+    return (keyName, ctor value)
 
 quotedString :: Parser ByteString
 quotedString = BS.pack <$> (char '\"' *> manyTill anyChar (char '\"'))
@@ -69,10 +87,15 @@ boolean :: Parser Bool
 boolean = string "false" *> return False <|> string "true" *> return True
 
 mkInfoMessage :: [HandshakeMessageField] -> Parser Message
-mkInfoMessage fields = do
+mkInfoMessage fields =
     Info <$> (asByteString $ lookup "server_id" fields)
          <*> (asByteString $ lookup "version" fields)
          <*> (asByteString $ lookup "go" fields)
+         <*> (asByteString $ lookup "host" fields)
+         <*> (asInt $ lookup "port" fields)
+         <*> (asBool $ lookup "auth_required" fields)
+         <*> (asBool $ lookup "ssl_required" fields)
+         <*> (asInt $ lookup "max_payload" fields)
 
 asByteString :: Maybe HandshakeMessageValue -> Parser (Maybe ByteString)
 asByteString Nothing               = return Nothing
