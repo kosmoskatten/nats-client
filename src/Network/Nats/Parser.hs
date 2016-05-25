@@ -44,6 +44,8 @@ parseInfoMessageFields = infoMessageField `sepBy` (char ',')
                      <|> parseServerPort
                      <|> parseServerAuthRequired
                      <|> parseSslRequired
+                     <|> parseTlsRequired
+                     <|> parseTlsVerify
                      <|> parseMaxPayload
 
 parseServerId :: Parser HandshakeMessageField
@@ -67,6 +69,12 @@ parseServerAuthRequired =
 
 parseSslRequired :: Parser HandshakeMessageField
 parseSslRequired = pair "\"ssl_required\"" boolean "ssl_required" Bool
+
+parseTlsRequired :: Parser HandshakeMessageField
+parseTlsRequired = pair "\"tls_required\"" boolean "tls_required" Bool
+
+parseTlsVerify :: Parser HandshakeMessageField
+parseTlsVerify = pair "\"tls_verify\"" boolean "tls_verify" Bool
 
 parseMaxPayload :: Parser HandshakeMessageField
 parseMaxPayload = pair "\"max_payload\"" decimal "max_payload" Int
@@ -95,6 +103,8 @@ mkInfoMessage fields =
          <*> (asInt $ lookup "port" fields)
          <*> (asBool $ lookup "auth_required" fields)
          <*> (asBool $ lookup "ssl_required" fields)
+         <*> (asBool $ lookup "tls_required" fields)
+         <*> (asBool $ lookup "tls_verify" fields)
          <*> (asInt $ lookup "max_payload" fields)
 
 asByteString :: Maybe HandshakeMessageValue -> Parser (Maybe ByteString)

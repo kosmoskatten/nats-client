@@ -12,6 +12,8 @@ data Message =
          , serverPort         :: !(Maybe Int)
          , serverAuthRequired :: !(Maybe Bool)
          , serverSslRequired  :: !(Maybe Bool)
+         , serverTlsRequired  :: !(Maybe Bool)
+         , serverTlsVerify    :: !(Maybe Bool)
          , maxPayload         :: !(Maybe Int)
          }
     deriving (Eq, Show)
