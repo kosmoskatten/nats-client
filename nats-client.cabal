@@ -14,9 +14,9 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Network.Nats
-                       Network.Nats.Builder
                        Network.Nats.Message
                        Network.Nats.Parser
+                       Network.Nats.Writer
   -- other-modules:       
   -- other-extensions:    
   build-depends:       base >=4.8 && <4.9
