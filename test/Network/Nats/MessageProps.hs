@@ -40,6 +40,7 @@ arbitraryInfo =
 arbitraryConnect :: Gen Message
 arbitraryConnect =
     Connect <$> arbitrary
+            <*> arbitrary
 
 -- | Test by write a Message to ByteString, and parse it back again.
 encodeDecodeMessage :: Message -> Bool

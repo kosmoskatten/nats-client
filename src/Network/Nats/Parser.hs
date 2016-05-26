@@ -63,6 +63,7 @@ parseConnectMessageFields :: Parser [HandshakeMessageField]
 parseConnectMessageFields = connectMessageField `sepBy` char ','
     where
       connectMessageField = parseClientVerbose
+                        <|> parseClientPedantic 
 
 parseServerId :: Parser HandshakeMessageField
 parseServerId = pair "\"server_id\"" quotedString "server_id" String
@@ -98,6 +99,9 @@ parseMaxPayload = pair "\"max_payload\"" decimal "max_payload" Int
 parseClientVerbose :: Parser HandshakeMessageField
 parseClientVerbose = pair "\"verbose\"" boolean "verbose" Bool
 
+parseClientPedantic :: Parser HandshakeMessageField
+parseClientPedantic = pair "\"pedantic\"" boolean "pedantic" Bool
+
 pair :: ByteString -> Parser a -> ByteString 
                -> (a -> HandshakeMessageValue) 
                -> Parser HandshakeMessageField
@@ -129,6 +133,7 @@ mkInfoMessage fields =
 mkConnectMessage :: [HandshakeMessageField] -> Parser Message
 mkConnectMessage fields =
     Connect <$> asBool (lookup "verbose" fields)
+            <*> asBool (lookup "pedantic" fields)
 
 asByteString :: Maybe HandshakeMessageValue -> Parser (Maybe ByteString)
 asByteString Nothing               = return Nothing

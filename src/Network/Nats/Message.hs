@@ -38,5 +38,9 @@ data Message =
     -- the client may sent a Connect message to the NATS server to
     -- provide more information about the current connection as
     -- well as security information.
-  | Connect { clientVerbose :: !(Maybe Bool) }
+  | Connect { clientVerbose  :: !(Maybe Bool)
+              -- ^ Turns on +OK protocol acknowledgements.
+            , clientPedantic :: !(Maybe Bool)
+              -- ^ Turns on additional strict format checking.
+            }
     deriving (Eq, Show)
