@@ -35,6 +35,8 @@ test-suite nats-tests
   other-modules:      Network.Nats.MessageProps
   type:               exitcode-stdio-1.0
   build-depends:      base >= 4.8 && <4.9
+                    , attoparsec
+                    , bytestring
                     , nats-client
                     , test-framework
                     , test-framework-quickcheck2
