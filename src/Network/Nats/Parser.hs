@@ -28,14 +28,14 @@ infoMessage :: Parser Message
 infoMessage = do
     void $ many' space
     void $ stringCI "info"
-    void $ space
+    void space
     void $ char '{'
     fields <- parseInfoMessageFields
     void $ char '}'
     mkInfoMessage fields
 
 parseInfoMessageFields :: Parser [HandshakeMessageField]
-parseInfoMessageFields = infoMessageField `sepBy` (char ',')
+parseInfoMessageFields = infoMessageField `sepBy` char ','
     where
       infoMessageField = parseServerId
                      <|> parseServerVersion
@@ -96,16 +96,16 @@ boolean = string "false" *> return False <|> string "true" *> return True
 
 mkInfoMessage :: [HandshakeMessageField] -> Parser Message
 mkInfoMessage fields =
-    Info <$> (asByteString $ lookup "server_id" fields)
-         <*> (asByteString $ lookup "version" fields)
-         <*> (asByteString $ lookup "go" fields)
-         <*> (asByteString $ lookup "host" fields)
-         <*> (asInt $ lookup "port" fields)
-         <*> (asBool $ lookup "auth_required" fields)
-         <*> (asBool $ lookup "ssl_required" fields)
-         <*> (asBool $ lookup "tls_required" fields)
-         <*> (asBool $ lookup "tls_verify" fields)
-         <*> (asInt $ lookup "max_payload" fields)
+    Info <$> asByteString (lookup "server_id" fields)
+         <*> asByteString (lookup "version" fields)
+         <*> asByteString (lookup "go" fields)
+         <*> asByteString (lookup "host" fields)
+         <*> asInt (lookup "port" fields)
+         <*> asBool (lookup "auth_required" fields)
+         <*> asBool (lookup "ssl_required" fields)
+         <*> asBool (lookup "tls_required" fields)
+         <*> asBool (lookup "tls_verify" fields)
+         <*> asInt (lookup "max_payload" fields)
 
 asByteString :: Maybe HandshakeMessageValue -> Parser (Maybe ByteString)
 asByteString Nothing               = return Nothing
