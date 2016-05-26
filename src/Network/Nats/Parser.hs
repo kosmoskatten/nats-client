@@ -21,9 +21,9 @@ data HandshakeMessageValue =
 type HandshakeMessageField = (ByteString, HandshakeMessageValue)
 
 message :: Parser Message
-message = infoMessage
+message = infoMessage <|> connectMessage
 
--- | The parsing of the info message is not performance critical.
+-- | The parsing of the Info message is not performance critical.
 infoMessage :: Parser Message
 infoMessage = do
     void $ many' space
@@ -47,6 +47,22 @@ parseInfoMessageFields = infoMessageField `sepBy` char ','
                      <|> parseTlsRequired
                      <|> parseTlsVerify
                      <|> parseMaxPayload
+
+-- | Nor is the parsing the Connect message performace critical.
+connectMessage :: Parser Message
+connectMessage = do
+    void $ many' space
+    void $ stringCI "connect"
+    void space
+    void $ char '{'
+    fields <- parseConnectMessageFields
+    void $ char '}'
+    mkConnectMessage fields
+
+parseConnectMessageFields :: Parser [HandshakeMessageField]
+parseConnectMessageFields = connectMessageField `sepBy` char ','
+    where
+      connectMessageField = parseClientVerbose
 
 parseServerId :: Parser HandshakeMessageField
 parseServerId = pair "\"server_id\"" quotedString "server_id" String
@@ -79,6 +95,9 @@ parseTlsVerify = pair "\"tls_verify\"" boolean "tls_verify" Bool
 parseMaxPayload :: Parser HandshakeMessageField
 parseMaxPayload = pair "\"max_payload\"" decimal "max_payload" Int
 
+parseClientVerbose :: Parser HandshakeMessageField
+parseClientVerbose = pair "\"verbose\"" boolean "verbose" Bool
+
 pair :: ByteString -> Parser a -> ByteString 
                -> (a -> HandshakeMessageValue) 
                -> Parser HandshakeMessageField
@@ -106,6 +125,10 @@ mkInfoMessage fields =
          <*> asBool (lookup "tls_required" fields)
          <*> asBool (lookup "tls_verify" fields)
          <*> asInt (lookup "max_payload" fields)
+
+mkConnectMessage :: [HandshakeMessageField] -> Parser Message
+mkConnectMessage fields =
+    Connect <$> asBool (lookup "verbose" fields)
 
 asByteString :: Maybe HandshakeMessageValue -> Parser (Maybe ByteString)
 asByteString Nothing               = return Nothing

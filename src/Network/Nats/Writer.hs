@@ -36,6 +36,8 @@ instance Writeable ByteString where
 -- | Translate a Message record to a Builder. The building of handshake
 -- messages are not optimized for speed :-)
 writeMessage :: Message -> Builder
+
+-- The first of the handshake messages; Info.
 writeMessage Info {..} =
     let fields = foldl' writeField [] 
                    [ ("\"server_id\"", Field <$> serverId)
@@ -51,6 +53,14 @@ writeMessage Info {..} =
                    ]
         fields' = intersperse (charUtf8 ',') $ reverse fields
     in mconcat $ byteString "INFO {":(fields' ++ [charUtf8 '}'])
+
+-- The second of the handshake messages; Connect.
+writeMessage Connect {..} =
+    let fields = foldl' writeField []
+                   [ ("\"verbose\"", Field <$> clientVerbose)
+                   ]
+        fields' = intersperse (charUtf8 ',') $ reverse fields
+    in mconcat $ byteString "CONNECT {":(fields' ++ [byteString "}\r\n"])
 
 -- | The translate a Field to a Builder and prepend it to the list of
 -- Builders.

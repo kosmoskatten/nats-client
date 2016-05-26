@@ -18,17 +18,28 @@ import Network.Nats.Writer (writeMessage)
 
 -- | Arbitrary instance for Message.
 instance Arbitrary Message where
-    arbitrary =
-        Info <$> perhaps valueString
-             <*> perhaps valueString
-             <*> perhaps valueString
-             <*> perhaps valueString
-             <*> perhaps posInt
-             <*> arbitrary
-             <*> arbitrary
-             <*> arbitrary
-             <*> arbitrary
-             <*> perhaps posInt
+    arbitrary = oneof [ arbitraryInfo
+                      , arbitraryConnect
+                      ]
+       
+-- | Arbitrary generation of Info messages.
+arbitraryInfo :: Gen Message
+arbitraryInfo =
+    Info <$> perhaps valueString
+         <*> perhaps valueString
+         <*> perhaps valueString
+         <*> perhaps valueString
+         <*> perhaps posInt
+         <*> arbitrary
+         <*> arbitrary
+         <*> arbitrary
+         <*> arbitrary
+         <*> perhaps posInt
+
+-- | Arbitrary generation of Connect messages.
+arbitraryConnect :: Gen Message
+arbitraryConnect =
+    Connect <$> arbitrary
 
 -- | Test by write a Message to ByteString, and parse it back again.
 encodeDecodeMessage :: Message -> Bool
