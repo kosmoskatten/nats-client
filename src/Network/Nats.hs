@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns      #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
 module Network.Nats
@@ -26,6 +25,8 @@ import Data.Conduit.Attoparsec
 import Data.Conduit.ByteString.Builder (builderToByteString)
 import Data.Conduit.Network
 
+import qualified Data.ByteString.Lazy as LBS
+
 import Network.Nats.Message (Message (..))
 import Network.Nats.Parser (message)
 import Network.Nats.Writer (writeMessage)
@@ -38,8 +39,8 @@ data NatsConnection = NatsConnection
       -- network conduits.
     , settings :: !NatsSettings
       -- ^ The user provided settings for establishing the connection.
-    , txQueue  :: !(TQueue Builder)
-      -- ^ The queue of data (as Builder values) to be transmitted.
+    , txQueue  :: !(TQueue ByteString)
+      -- ^ The queue of data (as ByteStrings) to be transmitted.
     }
 
 -- | User specified settings for a NATS connection.
@@ -83,25 +84,23 @@ runNatsClient settings' _uri app = do
         mapM_ wait [ receiver, transmitter ]
         return result
 
--- | Serialize and enqueue a message for sending. The serialization up
--- to and until the production of Builders are performed in the calling
--- thread. The serialization to ByteString is performed by the sender
--- thread.
+-- | Serialize and enqueue a message for sending. The serialization is
+-- performed by the calling thread.
 enqueueMessage :: NatsConnection -> Message -> IO ()
 enqueueMessage NatsConnection {..} msg = do
-    let !builder = writeMessage msg
-    atomically $ writeTQueue txQueue builder
+    let chunks = LBS.toChunks $ writeMessage msg
+    atomically $ mapM_ (writeTQueue txQueue) chunks
 
 transmissionPipeline :: NatsConnection -> IO ()
 transmissionPipeline NatsConnection {..} =
-    builderSource =$= builderToByteString $$ byteStringSink
+    chunkSource $$ byteStringSink
     where
-      builderSource :: Source IO Builder
-      builderSource = do
-          builder <- liftIO $ atomically (readTQueue txQueue)
-          liftIO $ print "Got builder"
-          yield builder
-          builderSource
+      chunkSource :: Source IO ByteString
+      chunkSource = do
+          chunk <- liftIO $ atomically (readTQueue txQueue)
+          liftIO $ print "Got chunk"
+          yield chunk
+          chunkSource
 
 -- | The reception pipeline. A stream of data from the source (produce
 -- ByteStrings from the socket), to the parser (produce messages) and

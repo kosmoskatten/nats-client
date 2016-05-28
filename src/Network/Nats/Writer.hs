@@ -10,6 +10,8 @@ import Data.ByteString.Builder
 import Data.Monoid ((<>))
 import Data.List (foldl', intersperse)
 
+import qualified Data.ByteString.Lazy as LBS
+
 import Network.Nats.Message (Message (..))
 
 -- | Existentially quantified Field type, to allow for a polymorph
@@ -33,12 +35,15 @@ instance Writeable Int where
 instance Writeable ByteString where
     write value = charUtf8 '\"' <> byteString value <> charUtf8 '\"'
 
--- | Translate a Message record to a Builder. The building of handshake
--- messages are not optimized for speed :-)
-writeMessage :: Message -> Builder
+-- | Translate a Message value to a lazy ByteString.
+writeMessage :: Message -> LBS.ByteString
+writeMessage = toLazyByteString . writeMessage'
+
+-- | Translate a Message value to a Builder.
+writeMessage' :: Message -> Builder
 
 -- The first of the handshake messages; Info.
-writeMessage Info {..} =
+writeMessage' Info {..} =
     let fields = foldl' writeField [] 
                    [ ("\"server_id\"", Field <$> serverId)
                    , ("\"version\"", Field <$> serverVersion)
@@ -55,7 +60,7 @@ writeMessage Info {..} =
     in mconcat $ byteString "INFO {":(fields' ++ [charUtf8 '}'])
 
 -- The second of the handshake messages; Connect.
-writeMessage Connect {..} =
+writeMessage' Connect {..} =
     let fields = foldl' writeField []
                    [ ("\"verbose\"", Field <$> clientVerbose)
                    , ("\"pedantic\"", Field <$> clientPedantic)

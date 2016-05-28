@@ -6,7 +6,6 @@ module Network.Nats.MessageProps
 
 import Data.Attoparsec.ByteString.Char8
 import Data.ByteString.Char8 (ByteString)
-import Data.ByteString.Builder (toLazyByteString)
 import Test.QuickCheck
 
 import qualified Data.ByteString.Char8 as BS
@@ -52,7 +51,7 @@ arbitraryConnect =
 -- | Test by write a Message to ByteString, and parse it back again.
 encodeDecodeMessage :: Message -> Bool
 encodeDecodeMessage msg =
-    let asByteString = LBS.toStrict $ toLazyByteString $ writeMessage msg
+    let asByteString = LBS.toStrict $ writeMessage msg
     in verify (parse message asByteString)
     where
       verify :: IResult ByteString Message -> Bool
