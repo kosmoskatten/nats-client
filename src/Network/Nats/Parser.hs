@@ -38,7 +38,7 @@ parseInfoMessageFields :: Parser [HandshakeMessageField]
 parseInfoMessageFields = infoMessageField `sepBy` char ','
     where
       infoMessageField = parseServerId
-                     <|> parseServerVersion
+                     <|> parseVersion
                      <|> parseGoVersion
                      <|> parseServerHost
                      <|> parseServerPort
@@ -63,13 +63,20 @@ parseConnectMessageFields :: Parser [HandshakeMessageField]
 parseConnectMessageFields = connectMessageField `sepBy` char ','
     where
       connectMessageField = parseClientVerbose
-                        <|> parseClientPedantic 
+                        <|> parseClientPedantic
+                        <|> parseSslRequired
+                        <|> parseClientAuthToken
+                        <|> parseClientUser
+                        <|> parseClientPass
+                        <|> parseClientName
+                        <|> parseClientLang
+                        <|> parseVersion
 
 parseServerId :: Parser HandshakeMessageField
 parseServerId = pair "\"server_id\"" quotedString "server_id" String
 
-parseServerVersion :: Parser HandshakeMessageField
-parseServerVersion = pair "\"version\"" quotedString "version" String
+parseVersion :: Parser HandshakeMessageField
+parseVersion = pair "\"version\"" quotedString "version" String
 
 parseGoVersion :: Parser HandshakeMessageField
 parseGoVersion = pair "\"go\"" quotedString "go" String
@@ -101,6 +108,22 @@ parseClientVerbose = pair "\"verbose\"" boolean "verbose" Bool
 
 parseClientPedantic :: Parser HandshakeMessageField
 parseClientPedantic = pair "\"pedantic\"" boolean "pedantic" Bool
+
+parseClientAuthToken :: Parser HandshakeMessageField
+parseClientAuthToken =
+    pair "\"auth_token\"" quotedString "auth_token" String
+
+parseClientUser :: Parser HandshakeMessageField
+parseClientUser = pair "\"user\"" quotedString "user" String
+
+parseClientPass :: Parser HandshakeMessageField
+parseClientPass = pair "\"pass\"" quotedString "pass" String
+
+parseClientName :: Parser HandshakeMessageField
+parseClientName = pair "\"name\"" quotedString "name" String
+
+parseClientLang :: Parser HandshakeMessageField
+parseClientLang = pair "\"lang\"" quotedString "lang" String
 
 pair :: ByteString -> Parser a -> ByteString 
                -> (a -> HandshakeMessageValue) 
@@ -134,6 +157,13 @@ mkConnectMessage :: [HandshakeMessageField] -> Parser Message
 mkConnectMessage fields =
     Connect <$> asBool (lookup "verbose" fields)
             <*> asBool (lookup "pedantic" fields)
+            <*> asBool (lookup "ssl_required" fields)
+            <*> asByteString (lookup "auth_token" fields)
+            <*> asByteString (lookup "user" fields)
+            <*> asByteString (lookup "pass" fields)
+            <*> asByteString (lookup "name" fields)
+            <*> asByteString (lookup "lang" fields)
+            <*> asByteString (lookup "version" fields)
 
 asByteString :: Maybe HandshakeMessageValue -> Parser (Maybe ByteString)
 asByteString Nothing               = return Nothing

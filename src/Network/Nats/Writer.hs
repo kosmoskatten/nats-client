@@ -59,6 +59,13 @@ writeMessage Connect {..} =
     let fields = foldl' writeField []
                    [ ("\"verbose\"", Field <$> clientVerbose)
                    , ("\"pedantic\"", Field <$> clientPedantic)
+                   , ("\"ssl_required\"", Field <$> clientSslRequired)
+                   , ("\"auth_token\"", Field <$> clientAuthToken)
+                   , ("\"user\"", Field <$> clientUser)
+                   , ("\"pass\"", Field <$> clientPass)
+                   , ("\"name\"", Field <$> clientName)
+                   , ("\"lang\"", Field <$> clientLang)
+                   , ("\"version\"", Field <$> clientVersion)
                    ]
         fields' = intersperse (charUtf8 ',') $ reverse fields
     in mconcat $ byteString "CONNECT {":(fields' ++ [byteString "}\r\n"])

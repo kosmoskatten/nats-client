@@ -41,6 +41,13 @@ arbitraryConnect :: Gen Message
 arbitraryConnect =
     Connect <$> arbitrary
             <*> arbitrary
+            <*> arbitrary
+            <*> perhaps valueString
+            <*> perhaps valueString
+            <*> perhaps valueString
+            <*> perhaps valueString
+            <*> perhaps valueString
+            <*> perhaps valueString
 
 -- | Test by write a Message to ByteString, and parse it back again.
 encodeDecodeMessage :: Message -> Bool

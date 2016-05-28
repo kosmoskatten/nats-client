@@ -38,9 +38,23 @@ data Message =
     -- the client may sent a Connect message to the NATS server to
     -- provide more information about the current connection as
     -- well as security information.
-  | Connect { clientVerbose  :: !(Maybe Bool)
+  | Connect { clientVerbose     :: !(Maybe Bool)
               -- ^ Turns on +OK protocol acknowledgements.
-            , clientPedantic :: !(Maybe Bool)
+            , clientPedantic    :: !(Maybe Bool)
               -- ^ Turns on additional strict format checking.
+            , clientSslRequired :: !(Maybe Bool)
+              -- ^ Indicates whether the client requires an SSL connection.
+            , clientAuthToken   :: !(Maybe ByteString)
+              -- ^ Client authorization token.
+            , clientUser        :: !(Maybe ByteString)
+              -- ^ Connection username (if auth_required is set).
+            , clientPass        :: !(Maybe ByteString)
+              -- ^ Connection password (if auth_required is set).
+            , clientName        :: !(Maybe ByteString)
+              -- ^ Optional client name.
+            , clientLang        :: !(Maybe ByteString)
+              -- The implementation of the client.
+            , clientVersion     :: !(Maybe ByteString)
+              -- ^ The version of the client.
             }
     deriving (Eq, Show)
