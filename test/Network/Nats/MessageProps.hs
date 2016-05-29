@@ -19,6 +19,7 @@ import Network.Nats.Writer (writeMessage)
 instance Arbitrary Message where
     arbitrary = oneof [ arbitraryInfo
                       , arbitraryConnect
+                      , return Ok
                       ]
        
 -- | Arbitrary generation of Info messages.

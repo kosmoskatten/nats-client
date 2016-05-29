@@ -21,7 +21,7 @@ data HandshakeMessageValue =
 type HandshakeMessageField = (ByteString, HandshakeMessageValue)
 
 message :: Parser Message
-message = infoMessage <|> connectMessage
+message = infoMessage <|> connectMessage <|> okMessage
 
 -- | The parsing of the Info message is not performance critical.
 infoMessage :: Parser Message
@@ -56,7 +56,7 @@ connectMessage = do
     void space
     void $ char '{'
     fields <- parseConnectMessageFields
-    void $ char '}'
+    void $ string "}\r\n"
     mkConnectMessage fields
 
 parseConnectMessageFields :: Parser [HandshakeMessageField]
@@ -71,6 +71,12 @@ parseConnectMessageFields = connectMessageField `sepBy` char ','
                         <|> parseClientName
                         <|> parseClientLang
                         <|> parseVersion
+
+okMessage :: Parser Message
+okMessage = do
+    void $ many' space
+    void $ stringCI "+OK\r\n"
+    return Ok
 
 parseServerId :: Parser HandshakeMessageField
 parseServerId = pair "\"server_id\"" quotedString "server_id" String

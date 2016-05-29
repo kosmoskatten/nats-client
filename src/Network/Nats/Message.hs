@@ -57,4 +57,9 @@ data Message =
             , clientVersion     :: !(Maybe ByteString)
               -- ^ The version of the client.
             }
+
+    -- | When the verbose (clientVerbose) option is set to true, the
+    -- server acknowledges each well-formed prototol message from the
+    -- client with a +OK message.
+  | Ok 
     deriving (Eq, Show)

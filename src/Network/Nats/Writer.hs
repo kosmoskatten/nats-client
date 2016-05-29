@@ -75,6 +75,9 @@ writeMessage' Connect {..} =
         fields' = intersperse (charUtf8 ',') $ reverse fields
     in mconcat $ byteString "CONNECT {":(fields' ++ [byteString "}\r\n"])
 
+-- Server acknowledge of a well-formed message.
+writeMessage' Ok = byteString "+OK\r\n"
+
 -- | The translate a Field to a Builder and prepend it to the list of
 -- Builders.
 writeField :: [Builder] -> (ByteString, Maybe Field) -> [Builder]
