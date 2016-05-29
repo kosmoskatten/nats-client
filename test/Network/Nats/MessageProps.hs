@@ -11,15 +11,20 @@ import Test.QuickCheck
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 
-import Network.Nats.Message (Message (..))
+import Network.Nats.Message (ProtocolError (..), Message (..))
 import Network.Nats.Parser (message)
 import Network.Nats.Writer (writeMessage)
+
+-- | Arbitrary instance for ProtocolError.
+instance Arbitrary ProtocolError where
+    arbitrary = elements [ minBound .. ]
 
 -- | Arbitrary instance for Message.
 instance Arbitrary Message where
     arbitrary = oneof [ arbitraryInfo
                       , arbitraryConnect
-                      , return Ok
+                      , arbitraryOk
+                      , arbitraryErr
                       ]
        
 -- | Arbitrary generation of Info messages.
@@ -48,6 +53,14 @@ arbitraryConnect =
             <*> perhaps valueString
             <*> perhaps valueString
             <*> perhaps valueString
+
+-- | Arbitrary generation of Ok messages.
+arbitraryOk :: Gen Message
+arbitraryOk = pure Ok
+
+-- | Arbitrary generation of Err messages.
+arbitraryErr :: Gen Message
+arbitraryErr = Err <$> arbitrary
 
 -- | Test by write a Message to ByteString, and parse it back again.
 encodeDecodeMessage :: Message -> Bool

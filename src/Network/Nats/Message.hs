@@ -1,8 +1,21 @@
 module Network.Nats.Message
-    ( Message (..)
+    ( ProtocolError (..)
+    , Message (..)
     ) where
 
 import Data.ByteString.Char8 (ByteString)
+
+-- | Protocol error enumeration.
+data ProtocolError =
+    UnknownProtocolOperation
+  | AuthorizationViolation
+  | AuthorizationTimeout
+  | ParserError
+  | StaleConnection
+  | SlowConsumer
+  | MaximumPayloadExceeded
+  | InvalidSubject
+    deriving (Bounded, Enum, Eq, Show)
 
 -- | The kind of messages that can be exchanged between the NATS server
 -- and a NATS client.
@@ -61,5 +74,11 @@ data Message =
     -- | When the verbose (clientVerbose) option is set to true, the
     -- server acknowledges each well-formed prototol message from the
     -- client with a +OK message.
-  | Ok 
+  | Ok
+
+    -- | The -ERR message is used by the server indicate a protocol,
+    -- authorization, or other runtime connection error to the client.
+    -- Most of those errors result in the server closing the
+    -- connection. InvalidSubject is the exception.
+  | Err !ProtocolError
     deriving (Eq, Show)

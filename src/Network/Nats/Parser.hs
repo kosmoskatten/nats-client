@@ -10,7 +10,7 @@ import Data.ByteString.Char8 (ByteString)
 
 import qualified Data.ByteString.Char8 as BS
 
-import Network.Nats.Message (Message (..))
+import Network.Nats.Message (ProtocolError (..), Message (..))
 
 data HandshakeMessageValue =
     Bool   !Bool
@@ -21,7 +21,7 @@ data HandshakeMessageValue =
 type HandshakeMessageField = (ByteString, HandshakeMessageValue)
 
 message :: Parser Message
-message = infoMessage <|> connectMessage <|> okMessage
+message = infoMessage <|> connectMessage <|> okMessage <|> errMessage
 
 -- | The parsing of the Info message is not performance critical.
 infoMessage :: Parser Message
@@ -77,6 +77,14 @@ okMessage = do
     void $ many' space
     void $ stringCI "+OK\r\n"
     return Ok
+
+errMessage :: Parser Message
+errMessage = do
+    void $ many' space
+    void $ stringCI "-ERR "
+    pe <- protocolError
+    void $ string "\r\n"
+    return $ Err pe
 
 parseServerId :: Parser HandshakeMessageField
 parseServerId = pair "\"server_id\"" quotedString "server_id" String
@@ -145,6 +153,32 @@ quotedString = BS.pack <$> (char '\"' *> manyTill anyChar (char '\"'))
 
 boolean :: Parser Bool
 boolean = string "false" *> return False <|> string "true" *> return True
+
+protocolError :: Parser ProtocolError
+protocolError =
+    stringCI "\'Unknown Protocol Operation\'" 
+        *> return UnknownProtocolOperation <|>
+
+    stringCI "\'Authorization Violation\'"
+        *> return AuthorizationViolation   <|>
+
+    stringCI "\'Authorization Timeout\'"
+        *> return AuthorizationTimeout     <|>
+
+    stringCI "\'Parser Error\'"
+        *> return ParserError              <|>
+
+    stringCI "\'Stale Connection\'"
+        *> return StaleConnection          <|>
+
+    stringCI "\'Slow Consumer\'"
+        *> return SlowConsumer             <|>
+
+    stringCI "\'Maximum Payload Exceeded\'"
+        *> return MaximumPayloadExceeded   <|>
+
+    stringCI "\'Invalid Subject\'"
+        *> return InvalidSubject
 
 mkInfoMessage :: [HandshakeMessageField] -> Parser Message
 mkInfoMessage fields =

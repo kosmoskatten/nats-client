@@ -12,7 +12,7 @@ import Data.List (foldl', intersperse)
 
 import qualified Data.ByteString.Lazy as LBS
 
-import Network.Nats.Message (Message (..))
+import Network.Nats.Message (ProtocolError (..), Message (..))
 
 -- | Existentially quantified Field type, to allow for a polymorph
 -- list of Fields. All fields with the contraint of beeing Writeable.
@@ -78,6 +78,10 @@ writeMessage' Connect {..} =
 -- Server acknowledge of a well-formed message.
 writeMessage' Ok = byteString "+OK\r\n"
 
+-- | Server indication of a protocol, authorization, or other
+-- runtime connection error.
+writeMessage' (Err pe) = byteString "-ERR " <> writePE pe <> "\r\n"
+
 -- | The translate a Field to a Builder and prepend it to the list of
 -- Builders.
 writeField :: [Builder] -> (ByteString, Maybe Field) -> [Builder]
@@ -87,3 +91,14 @@ writeField xs (name, Just (Field value)) =
 
 -- There's a Nothing Field. Just return the unmodified Builder list.
 writeField xs (_, Nothing) = xs
+
+-- | Translate a ProtocolError to a Builder.
+writePE :: ProtocolError -> Builder
+writePE UnknownProtocolOperation = byteString "\'Unknown Protocol Operation\'"
+writePE AuthorizationViolation   = byteString "\'Authorization Violation\'"
+writePE AuthorizationTimeout     = byteString "\'Authorization Timeout\'"
+writePE ParserError              = byteString "\'Parser Error\'"
+writePE StaleConnection          = byteString "\'Stale Connection\'"
+writePE SlowConsumer             = byteString "\'Slow Consumer\'"
+writePE MaximumPayloadExceeded   = byteString "\'Maximum Payload Exceeded\'"
+writePE InvalidSubject           = byteString "\'Invalid Subject\'"
