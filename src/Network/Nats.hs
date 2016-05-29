@@ -7,12 +7,17 @@ module Network.Nats
     , NatsURI
     , defaultSettings
     , runNatsClient
+
+    -- For debugging purposes the parser/writer is exported.
+    , Message (..)
+    , ProtocolError (..)
+    , parseMessage
+    , writeMessage
     ) where
 
 import Control.Concurrent (threadDelay)
 import Control.Concurrent.Async (async, cancel, wait)
-import Control.Concurrent.STM ( TQueue
-                              , atomically
+import Control.Concurrent.STM ( atomically
                               , newTQueueIO
                               , readTQueue
                               , writeTQueue
@@ -26,45 +31,15 @@ import Data.Conduit.Network
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as LBS
 
-import Network.Nats.Message (Message (..))
-import Network.Nats.Parser (message)
+import Network.Nats.Message (Message (..), ProtocolError (..))
+import Network.Nats.Parser (parseMessage)
+import Network.Nats.Types ( NatsApp
+                          , NatsURI
+                          , NatsConnection (..)
+                          , NatsSettings (..)
+                          , defaultSettings
+                          )
 import Network.Nats.Writer (writeMessage)
-
--- | The context needed to maintain one NATS connection. Content is opaque
--- to the user.
-data NatsConnection = NatsConnection
-    { appData  :: !AppData
-      -- ^ Stuff gotten from the TCP client, e.g. the source and sink
-      -- network conduits.
-    , settings :: !NatsSettings
-      -- ^ The user provided settings for establishing the connection.
-    , txQueue  :: !(TQueue ByteString)
-      -- ^ The queue of data (as ByteStrings) to be transmitted.
-    }
-
--- | User specified settings for a NATS connection.
-data NatsSettings = NatsSettings
-    { verbose  :: !Bool
-      -- ^ Turns on +OK protocol acknowledgements.
-    , pedantic :: !Bool
-      -- ^ Turns on additional strict format checking, e.g.
-      -- properly formed subjects.
-    } deriving Show
-
--- | Type alias. A NatsApp is an IO action taking a Nats connection
--- and returning a type a.
-type NatsApp a = (NatsConnection -> IO a)
-
--- | Type alias. URI to specify NATS connection.
-type NatsURI = ByteString
-
--- | Default NATS settings.
-defaultSettings :: NatsSettings
-defaultSettings =
-    NatsSettings
-        { verbose  = False
-        , pedantic = False
-        }
 
 runNatsClient :: NatsSettings -> NatsURI -> NatsApp a -> IO a
 runNatsClient settings' _uri app = do
@@ -107,7 +82,8 @@ transmissionPipeline NatsConnection {..} = do
 receptionPipeline :: NatsConnection -> IO ()
 receptionPipeline conn = do
     let source = appSource $ appData conn
-    source =$= streamLogger =$= conduitParserEither message $$ messageSink
+    source =$= streamLogger =$= conduitParserEither parseMessage 
+        $$ messageSink
     where
       messageSink :: Sink (Either ParseError (PositionRange, Message)) IO ()
       messageSink = awaitForever $ \eMsg ->

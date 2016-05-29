@@ -11,9 +11,11 @@ import Test.QuickCheck
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 
-import Network.Nats.Message (ProtocolError (..), Message (..))
-import Network.Nats.Parser (message)
-import Network.Nats.Writer (writeMessage)
+import Network.Nats ( ProtocolError (..)
+                    , Message (..)
+                    , parseMessage
+                    , writeMessage
+                    )
 
 -- | Arbitrary instance for ProtocolError.
 instance Arbitrary ProtocolError where
@@ -66,7 +68,7 @@ arbitraryErr = Err <$> arbitrary
 encodeDecodeMessage :: Message -> Bool
 encodeDecodeMessage msg =
     let asByteString = LBS.toStrict $ writeMessage msg
-    in verify (parse message asByteString)
+    in verify (parse parseMessage asByteString)
     where
       verify :: IResult ByteString Message -> Bool
       verify result =

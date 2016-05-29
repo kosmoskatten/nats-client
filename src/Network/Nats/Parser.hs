@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.Nats.Parser
-    ( message
+    ( parseMessage
     ) where
 
 import Control.Applicative ((<|>))
@@ -20,8 +20,11 @@ data HandshakeMessageValue =
 
 type HandshakeMessageField = (ByteString, HandshakeMessageValue)
 
-message :: Parser Message
-message = infoMessage <|> connectMessage <|> okMessage <|> errMessage
+parseMessage :: Parser Message
+parseMessage = infoMessage 
+           <|> connectMessage 
+           <|> okMessage 
+           <|> errMessage
 
 -- | The parsing of the Info message is not performance critical.
 infoMessage :: Parser Message
