@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TupleSections     #-}
 module Network.Nats
     ( NatsConnection
+    , NatsException (..)
     , NatsSettings (..)
     , NatsApp
     , NatsURI
@@ -16,47 +18,76 @@ module Network.Nats
     ) where
 
 import Control.Concurrent (threadDelay)
-import Control.Concurrent.Async (async, cancel, wait)
+import Control.Concurrent.Async (Async, async, cancel, wait)
 import Control.Concurrent.STM ( atomically
                               , newTQueueIO
                               , readTQueue
                               , writeTQueue
                               )
+import Control.Exception (bracket, throw)
 import Control.Monad.IO.Class (liftIO)
 import Data.ByteString (ByteString)
-import Data.Conduit
-import Data.Conduit.Attoparsec
-import Data.Conduit.Network
+import Data.Conduit ( Conduit
+                    , Sink
+                    , Source
+                    , (=$=), ($$)
+                    , awaitForever
+                    , yield
+                    )
+import Data.Conduit.Attoparsec ( ParseError
+                               , PositionRange
+                               , conduitParserEither
+                               )
+import Data.Conduit.Network ( AppData
+                            , appSink
+                            , appSource
+                            , clientSettings
+                            , runTCPClient
+                            )
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as LBS
 
-import Network.Nats.Message (Message (..), ProtocolError (..))
+import Network.Nats.Message ( Message (..)
+                            , ProtocolError (..)
+                            , isFatalError
+                            )
 import Network.Nats.Parser (parseMessage)
 import Network.Nats.Types ( NatsApp
                           , NatsURI
                           , NatsConnection (..)
+                          , NatsException (..)
                           , NatsSettings (..)
                           , defaultSettings
                           )
 import Network.Nats.Writer (writeMessage)
 
+-- | Run the Nats client given the settings and connection URI. Once
+-- the NatsApp has terminated its execution the connection is closed.
 runNatsClient :: NatsSettings -> NatsURI -> NatsApp a -> IO a
 runNatsClient settings' _uri app = do
     let tcpSettings = clientSettings 4222 "localhost"
-    runTCPClient tcpSettings $ \appData' -> do
-        txQueue' <- newTQueueIO
-        let conn = NatsConnection { appData  = appData'
-                                  , settings = settings'
-                                  , txQueue  = txQueue'
-                                  }
-        receiver    <- async $ receptionPipeline conn
-        transmitter <- async $ transmissionPipeline conn
+    runTCPClient tcpSettings $ \appData' ->
+        bracket (setup appData')
+                teardown
+                (app . fst)
+    where
+      setup :: AppData -> IO (NatsConnection, [ Async () ])
+      setup appData' = do
+          txQueue' <- newTQueueIO
+          let conn = NatsConnection
+                       { appData  = appData'
+                       , settings = settings'
+                       , txQueue  = txQueue'
+                       }
+          (conn,) <$> mapM async [ receptionPipeline conn
+                                 , transmissionPipeline conn
+                                 ]
 
-        result <- app conn
-        mapM_ cancel [ receiver, transmitter ]
-        mapM_ wait [ receiver, transmitter ]
-        return result
+      teardown :: (NatsConnection, [ Async () ]) -> IO ()
+      teardown (_, xs) = do
+          mapM_ cancel xs
+          mapM_ wait xs
 
 -- | Serialize and enqueue a message for sending. The serialization is
 -- performed by the calling thread.
@@ -94,9 +125,14 @@ receptionPipeline conn = do
 -- | Handle the semantic actions for one received message.
 handleMessage :: NatsConnection -> Message -> IO ()
 
--- Handle an Info message. Just produce and enqueue a Connect message.
+-- | Handle an Info message. Just produce and enqueue a Connect message.
 handleMessage conn@NatsConnection {..} msg@Info {..} =
     enqueueMessage conn $ mkConnectMessage settings msg
+
+-- | Handle an Err message. If the error is fatal a NatsException is thrown.
+handleMessage _ (Err pe)
+    | isFatalError pe = throw (NatsException pe)
+    | otherwise       = return ()
 
 handleMessage _conn _msg = putStrLn "Got something else."
 

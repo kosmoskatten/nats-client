@@ -2,14 +2,18 @@ module Network.Nats.Types
     ( NatsApp 
     , NatsURI
     , NatsConnection (..)
+    , NatsException (..)
     , NatsSettings (..)
     , defaultSettings
     ) where
 
 import Control.Concurrent.STM (TQueue)
-import Data.Conduit.Network
-
+import Control.Exception (Exception)
+import Data.Conduit.Network (AppData)
 import Data.ByteString (ByteString)
+import Data.Typeable (Typeable)
+
+import Network.Nats.Message (ProtocolError)
 
 -- | Type alias. A NatsApp is an IO action taking a Nats connection
 -- and returning a type a.
@@ -29,6 +33,12 @@ data NatsConnection = NatsConnection
     , txQueue  :: !(TQueue ByteString)
       -- ^ The queue of data (as ByteStrings) to be transmitted.
     }
+
+-- | Exception to be thrown from the Nats client.
+data NatsException = NatsException !ProtocolError
+    deriving (Typeable, Show)
+
+instance Exception NatsException
 
 -- | User specified settings for a NATS connection.
 data NatsSettings = NatsSettings

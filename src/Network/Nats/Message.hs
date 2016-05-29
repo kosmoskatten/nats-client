@@ -1,6 +1,7 @@
 module Network.Nats.Message
     ( ProtocolError (..)
     , Message (..)
+    , isFatalError
     ) where
 
 import Data.ByteString.Char8 (ByteString)
@@ -82,3 +83,10 @@ data Message =
     -- connection. InvalidSubject is the exception.
   | Err !ProtocolError
     deriving (Eq, Show)
+
+-- | Tell if a protocol error is fatal or not. Fatal is an error that
+-- will make the server close the connection. All protocol errors but
+-- InvalidSubject are fatal.
+isFatalError :: ProtocolError -> Bool
+isFatalError InvalidSubject = False
+isFatalError _              = True
