@@ -19,12 +19,11 @@ import Control.Concurrent.STM ( TQueue
                               )
 import Control.Monad.IO.Class (liftIO)
 import Data.ByteString (ByteString)
-import Data.ByteString.Builder (Builder)
 import Data.Conduit
 import Data.Conduit.Attoparsec
-import Data.Conduit.ByteString.Builder (builderToByteString)
 import Data.Conduit.Network
 
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as LBS
 
 import Network.Nats.Message (Message (..))
@@ -92,13 +91,13 @@ enqueueMessage NatsConnection {..} msg = do
     atomically $ mapM_ (writeTQueue txQueue) chunks
 
 transmissionPipeline :: NatsConnection -> IO ()
-transmissionPipeline NatsConnection {..} =
-    chunkSource $$ byteStringSink
+transmissionPipeline NatsConnection {..} = do
+    let sink = appSink appData
+    chunkSource =$= streamLogger $$ sink
     where
       chunkSource :: Source IO ByteString
       chunkSource = do
           chunk <- liftIO $ atomically (readTQueue txQueue)
-          liftIO $ print "Got chunk"
           yield chunk
           chunkSource
 
@@ -108,7 +107,7 @@ transmissionPipeline NatsConnection {..} =
 receptionPipeline :: NatsConnection -> IO ()
 receptionPipeline conn = do
     let source = appSource $ appData conn
-    source =$= conduitParserEither message $$ messageSink
+    source =$= streamLogger =$= conduitParserEither message $$ messageSink
     where
       messageSink :: Sink (Either ParseError (PositionRange, Message)) IO ()
       messageSink = awaitForever $ \eMsg ->
@@ -123,7 +122,7 @@ handleMessage :: NatsConnection -> Message -> IO ()
 handleMessage conn@NatsConnection {..} msg@Info {..} =
     enqueueMessage conn $ mkConnectMessage settings msg
 
-handleMessage _conn msg = putStrLn "Got something else."
+handleMessage _conn _msg = putStrLn "Got something else."
 
 -- | Given the settings and the Info record, produce a Connect record.
 mkConnectMessage :: NatsSettings -> Message -> Message
@@ -143,42 +142,9 @@ mkConnectMessage _ _ = error "Must be an Info record."
 delayApp :: Int -> NatsConnection -> IO ()
 delayApp sec _ = threadDelay $ sec * 1000000
 
-byteStringSink :: Sink ByteString IO ()
-byteStringSink = awaitForever $ liftIO . print
-
-{-runNatsClient2 :: ByteString -> (NatsConnection -> IO a) -> IO a
-runNatsClient2 _ client = do
-    let settings = clientSettings 4222 "localhost"
-    runTCPClient settings $ \appData' -> do
-        let conn = NatsConnection { appData = appData' }
-        client conn
-
-testPipeline :: NatsConnection -> IO ()
-testPipeline conn = do
-    let source = appSource $ appData conn
-    source =$= conduitParserEither message $$ printOutput2
-
-printOutput :: Sink ByteString IO ()
-printOutput = do
-    r <- await
-    case r of
-        Just s -> do
-            liftIO (print s)
-            printOutput
-        Nothing -> liftIO (print "Done!")
-
-printOutput2 :: Sink (Either ParseError (PositionRange, Message)) IO ()
-printOutput2 = do
-    r <- await
-    case r of
-        Just eMsg ->
-            case eMsg of
-                Right (_, m) -> do
-                    liftIO (print m)
-                    printOutput2
-                Left _ -> do
-                    liftIO (print "Got parse error!")
-                    printOutput2
-        Nothing -> liftIO (print "Done!")
--}
+streamLogger :: Conduit ByteString IO ByteString
+streamLogger = 
+    awaitForever $ \str -> do
+        liftIO $ BS.putStrLn str
+        yield str
 
