@@ -86,8 +86,11 @@ runNatsClient settings' _uri app = do
 
       teardown :: (NatsConnection, [ Async () ]) -> IO ()
       teardown (_, xs) = do
-          mapM_ cancel xs
-          mapM_ wait xs
+          putStrLn "Start teardown"
+          --mapM_ cancel xs
+          putStrLn "Done cancel"
+          --mapM_ wait xs
+          putStrLn "Done with teardown"
 
 -- | Serialize and enqueue a message for sending. The serialization is
 -- performed by the calling thread.
