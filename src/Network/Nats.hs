@@ -7,6 +7,7 @@ module Network.Nats
     , NatsSettings (..)
     , NatsApp
     , NatsURI
+    , SubscriptionId (..)
     , defaultSettings
     , runNatsClient
 
@@ -46,17 +47,17 @@ import Data.Conduit.Network ( appSink
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as LBS
 
-import Network.Nats.Message ( Message (..)
-                            , ProtocolError (..)
-                            , isFatalError
-                            )
+import Network.Nats.Message (Message (..))
 import Network.Nats.Parser (parseMessage)
 import Network.Nats.Types ( NatsApp
                           , NatsURI
                           , NatsConnection (..)
                           , NatsException (..)
                           , NatsSettings (..)
+                          , ProtocolError (..)
+                          , SubscriptionId (..)
                           , defaultSettings
+                          , isFatalError
                           )
 import Network.Nats.Writer (writeMessage)
 

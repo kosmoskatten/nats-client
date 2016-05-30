@@ -13,6 +13,7 @@ import qualified Data.ByteString.Lazy.Char8 as LBS
 
 import Network.Nats ( ProtocolError (..)
                     , Message (..)
+                    , SubscriptionId (..)
                     , parseMessage
                     , writeMessage
                     )
@@ -25,6 +26,7 @@ instance Arbitrary ProtocolError where
 instance Arbitrary Message where
     arbitrary = oneof [ arbitraryInfo
                       , arbitraryConnect
+                      , arbitrarySub
                       , arbitraryOk
                       , arbitraryErr
                       ]
@@ -55,6 +57,12 @@ arbitraryConnect =
             <*> perhaps valueString
             <*> perhaps valueString
             <*> perhaps valueString
+
+-- | Arbitrary generation of Sub messages.
+arbitrarySub :: Gen Message
+arbitrarySub = Sub <$> alnumString 
+                   <*> perhaps alnumString 
+                   <*> (Sid <$> alnumString)
 
 -- | Arbitrary generation of Ok messages.
 arbitraryOk :: Gen Message
@@ -88,6 +96,14 @@ valueString =
     where
       selection :: [Char]
       selection = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "+-_!?*(){} "
+
+-- | Generate a non-empty ByteString which is plain alphanumeric.
+alnumString :: Gen ByteString
+alnumString =
+    BS.pack <$> listOf1 (elements selection)
+    where
+      selection :: [Char]
+      selection = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] 
 
 -- | Generate a positive integer. Can be max size of Int.
 posInt :: Gen Int

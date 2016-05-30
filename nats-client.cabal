@@ -25,6 +25,7 @@ library
                      , bytestring
                      , conduit
                      , conduit-extra
+                     , random
                      , stm
                      , transformers
   hs-source-dirs:      src

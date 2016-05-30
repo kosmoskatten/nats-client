@@ -1,22 +1,10 @@
 module Network.Nats.Message
-    ( ProtocolError (..)
-    , Message (..)
-    , isFatalError
+    ( Message (..)
     ) where
 
 import Data.ByteString.Char8 (ByteString)
 
--- | Protocol error enumeration.
-data ProtocolError =
-    UnknownProtocolOperation
-  | AuthorizationViolation
-  | AuthorizationTimeout
-  | ParserError
-  | StaleConnection
-  | SlowConsumer
-  | MaximumPayloadExceeded
-  | InvalidSubject
-    deriving (Bounded, Enum, Eq, Show)
+import Network.Nats.Types (ProtocolError, SubscriptionId)
 
 -- | The kind of messages that can be exchanged between the NATS server
 -- and a NATS client.
@@ -72,6 +60,14 @@ data Message =
               -- ^ The version of the client.
             }
 
+    -- | The Sub message initiates a subscription to a subject,
+    -- optionally joining a distributed queue group.
+    -- subject: The subject name to subscribe to.
+    -- (Optional) queue group: If specified, the subscriper will join 
+    -- this queue group.
+    -- sid: A unique alphanumeric SubscriptionId.
+  | Sub !ByteString !(Maybe ByteString) !SubscriptionId
+
     -- | When the verbose (clientVerbose) option is set to true, the
     -- server acknowledges each well-formed prototol message from the
     -- client with a +OK message.
@@ -83,10 +79,3 @@ data Message =
     -- connection. InvalidSubject is the exception.
   | Err !ProtocolError
     deriving (Eq, Show)
-
--- | Tell if a protocol error is fatal or not. Fatal is an error that
--- will make the server close the connection. All protocol errors but
--- InvalidSubject are fatal.
-isFatalError :: ProtocolError -> Bool
-isFatalError InvalidSubject = False
-isFatalError _              = True

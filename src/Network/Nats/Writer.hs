@@ -12,7 +12,8 @@ import Data.List (foldl', intersperse)
 
 import qualified Data.ByteString.Lazy as LBS
 
-import Network.Nats.Message (ProtocolError (..), Message (..))
+import Network.Nats.Message (Message (..))
+import Network.Nats.Types (ProtocolError (..), SubscriptionId (..))
 
 -- | Existentially quantified Field type, to allow for a polymorph
 -- list of Fields. All fields with the contraint of beeing Writeable.
@@ -75,6 +76,17 @@ writeMessage' Connect {..} =
         fields' = intersperse (charUtf8 ',') $ reverse fields
     in mconcat $ byteString "CONNECT {":(fields' ++ [byteString "}\r\n"])
 
+-- Sub message without a queue group.
+writeMessage' (Sub subject Nothing sid) =
+    byteString "SUB " <> byteString subject <> charUtf8 ' ' 
+                      <> writeSid sid <> byteString "\r\n"
+
+-- Sub message with a queue group.
+writeMessage' (Sub subject (Just queue) sid) =
+    byteString "SUB " <> byteString subject <> charUtf8 ' '
+                      <> byteString queue <> charUtf8 ' '
+                      <> writeSid sid <> byteString "\r\n"
+
 -- Server acknowledge of a well-formed message.
 writeMessage' Ok = byteString "+OK\r\n"
 
@@ -102,3 +114,7 @@ writePE StaleConnection          = byteString "\'Stale Connection\'"
 writePE SlowConsumer             = byteString "\'Slow Consumer\'"
 writePE MaximumPayloadExceeded   = byteString "\'Maximum Payload Exceeded\'"
 writePE InvalidSubject           = byteString "\'Invalid Subject\'"
+
+-- | Translate a SubscriptionId to a Builder.
+writeSid :: SubscriptionId -> Builder
+writeSid (Sid sid) = byteString sid

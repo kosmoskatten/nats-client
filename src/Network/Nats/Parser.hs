@@ -10,7 +10,8 @@ import Data.ByteString.Char8 (ByteString)
 
 import qualified Data.ByteString.Char8 as BS
 
-import Network.Nats.Message (ProtocolError (..), Message (..))
+import Network.Nats.Message (Message (..))
+import Network.Nats.Types (ProtocolError (..), SubscriptionId (..))
 
 data HandshakeMessageValue =
     Bool   !Bool
@@ -22,7 +23,8 @@ type HandshakeMessageField = (ByteString, HandshakeMessageValue)
 
 parseMessage :: Parser Message
 parseMessage = infoMessage 
-           <|> connectMessage 
+           <|> connectMessage
+           <|> subMessage
            <|> okMessage 
            <|> errMessage
 
@@ -74,6 +76,33 @@ parseConnectMessageFields = connectMessageField `sepBy` char ','
                         <|> parseClientName
                         <|> parseClientLang
                         <|> parseVersion
+
+subMessage :: Parser Message
+subMessage = do
+    void $ many' space
+    subMessageWithQueue <|> subMessageWithoutQueue
+
+subMessageWithQueue :: Parser Message
+subMessageWithQueue = do
+    void $ stringCI "sub"
+    void space
+    subject <- takeTill isSpace
+    void space
+    queue <- takeTill isSpace
+    void space
+    sid <- Sid <$> takeTill (== '\r')
+    void $ string "\r\n"
+    return $ Sub subject (Just queue) sid
+    
+subMessageWithoutQueue :: Parser Message
+subMessageWithoutQueue = do
+    void $ stringCI "sub"
+    void space
+    subject <- takeTill isSpace
+    void space
+    sid <- Sid <$> takeTill (== '\r')
+    void $ string "\r\n"
+    return $ Sub subject Nothing sid
 
 okMessage :: Parser Message
 okMessage = do
