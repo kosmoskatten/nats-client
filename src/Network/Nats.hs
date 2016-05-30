@@ -58,6 +58,7 @@ import Network.Nats.Types ( NatsApp
                           , SubscriptionId (..)
                           , defaultSettings
                           , isFatalError
+                          , newSubscriptionId
                           )
 import Network.Nats.Writer (writeMessage)
 
@@ -147,6 +148,12 @@ mkConnectMessage _ _ = error "Must be an Info record."
 
 delayApp :: Int -> NatsConnection -> IO ()
 delayApp sec _ = threadDelay $ sec * 1000000
+
+subscribeApp :: NatsConnection -> IO ()
+subscribeApp conn = do
+    sid <- newSubscriptionId
+    enqueueMessage conn (Sub "foo" Nothing sid)
+    threadDelay 5000000
 
 streamLogger :: Conduit ByteString IO ByteString
 streamLogger = 
