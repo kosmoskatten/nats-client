@@ -60,6 +60,17 @@ data Message =
               -- ^ The version of the client.
             }
 
+    -- | The Pub message publishes the message payload to the given
+    -- subject name. If a reply subject is supplied, it will be
+    -- delivered to eligible subscribers along with the supplied
+    -- payload. Payload can be zero size.
+    -- subject: The destination subject to publish to.
+    -- reply-to: The reply inbox subject that subscribers can use to
+    -- send a response back to the publisher/requestor.
+    -- #bytes: Implicit by the length of payload.
+    -- payload: The message payload data.
+  | Pub !ByteString !(Maybe ByteString) !ByteString
+
     -- | The Sub message initiates a subscription to a subject,
     -- optionally joining a distributed queue group.
     -- subject: The subject name to subscribe to.

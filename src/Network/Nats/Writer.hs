@@ -10,6 +10,7 @@ import Data.ByteString.Builder
 import Data.Monoid ((<>))
 import Data.List (foldl', intersperse)
 
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 
 import Network.Nats.Message (Message (..))
@@ -75,6 +76,19 @@ writeMessage' Connect {..} =
                    ]
         fields' = intersperse (charUtf8 ',') $ reverse fields
     in mconcat $ byteString "CONNECT {":(fields' ++ [byteString "}\r\n"])
+
+-- Pub message without a reply subject.
+writeMessage' (Pub subject Nothing payload) =
+    byteString "PUB " <> byteString subject <> charUtf8 ' '
+                      <> intDec (BS.length payload) <> byteString "\r\n"
+                      <> byteString payload <> byteString "\r\n"
+
+-- Pub message with a reply subject.
+writeMessage' (Pub subject (Just reply) payload) =
+    byteString "PUB " <> byteString subject <> charUtf8 ' '
+                      <> byteString reply <> charUtf8 ' '
+                      <> intDec (BS.length payload) <> byteString "\r\n"
+                      <> byteString payload <> byteString "\r\n"
 
 -- Sub message without a queue group.
 writeMessage' (Sub subject Nothing sid) =
