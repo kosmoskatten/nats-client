@@ -26,6 +26,7 @@ instance Arbitrary ProtocolError where
 instance Arbitrary Message where
     arbitrary = oneof [ arbitraryInfo
                       , arbitraryConnect
+                      , arbitraryMsg
                       , arbitraryPub
                       , arbitrarySub
                       , arbitraryOk
@@ -58,6 +59,13 @@ arbitraryConnect =
             <*> perhaps valueString
             <*> perhaps valueString
             <*> perhaps valueString
+
+-- | Arbitrary generation of Msg messages.
+arbitraryMsg :: Gen Message
+arbitraryMsg = Msg <$> alnumString
+                   <*> (Sid <$> alnumString)
+                   <*> perhaps alnumString
+                   <*> valueString
 
 -- | Arbitrary generation of Pub messages.
 arbitraryPub :: Gen Message

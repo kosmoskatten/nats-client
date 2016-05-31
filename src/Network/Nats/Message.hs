@@ -8,6 +8,8 @@ import Network.Nats.Types (ProtocolError, SubscriptionId)
 
 -- | The kind of messages that can be exchanged between the NATS server
 -- and a NATS client.
+-- Some of the documentation strings are taken from:
+-- http://nats.io/documentation/internals/nats-protocol/
 data Message =
     -- | As soon as the server accepts a connection from the client, it
     -- will send information about itself and the configuration and
@@ -59,6 +61,15 @@ data Message =
             , clientVersion     :: !(Maybe ByteString)
               -- ^ The version of the client.
             }
+
+    -- | The Msg message carries payload from the server to the client.
+    -- subject: Subject name this message was received on.
+    -- sid: The unique alphanumeric subscription ID of the subject.
+    -- reply-to: The inbox subject on which the publisher is listening
+    -- for responses.
+    -- #bytes: Implicit by the length of the payload.
+    -- payload: The message payload data.
+  | Msg !ByteString !SubscriptionId !(Maybe ByteString) !ByteString
 
     -- | The Pub message publishes the message payload to the given
     -- subject name. If a reply subject is supplied, it will be

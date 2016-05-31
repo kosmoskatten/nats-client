@@ -23,7 +23,8 @@ data HandshakeMessageValue =
 type HandshakeMessageField = (ByteString, HandshakeMessageValue)
 
 parseMessage :: Parser Message
-parseMessage = infoMessage 
+parseMessage = msgMessage
+           <|> infoMessage 
            <|> connectMessage
            <|> pubMessage
            <|> subMessage
@@ -79,6 +80,41 @@ parseConnectMessageFields = connectMessageField `sepBy` char ','
                         <|> parseClientName
                         <|> parseClientLang
                         <|> parseVersion
+
+msgMessage :: Parser Message
+msgMessage = do
+    skipSpace
+    msgMessageWithReply <|> msgMessageWithoutReply
+
+msgMessageWithReply :: Parser Message
+msgMessageWithReply = do
+    msgName "MSG"
+    singleSpace
+    subject <- takeTill isSpace
+    singleSpace
+    sid <- Sid <$> takeTill isSpace
+    singleSpace
+    reply <- takeTill isSpace
+    singleSpace
+    len <- decimal
+    newLine
+    payload <- AP.take len
+    newLine
+    return $ Msg subject sid (Just reply) payload
+
+msgMessageWithoutReply :: Parser Message
+msgMessageWithoutReply = do
+    msgName "MSG"
+    singleSpace
+    subject <- takeTill isSpace
+    singleSpace
+    sid <- Sid <$> takeTill isSpace
+    singleSpace
+    len <- decimal
+    newLine
+    payload <- AP.take len
+    newLine
+    return $ Msg subject sid Nothing payload
 
 pubMessage :: Parser Message
 pubMessage = do

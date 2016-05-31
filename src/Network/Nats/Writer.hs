@@ -77,6 +77,21 @@ writeMessage' Connect {..} =
         fields' = intersperse (charUtf8 ',') $ reverse fields
     in mconcat $ byteString "CONNECT {":(fields' ++ [byteString "}\r\n"])
 
+-- Msg message without a reply subject.
+writeMessage' (Msg subject sid Nothing payload) =
+    byteString "MSG " <> byteString subject <> charUtf8 ' '
+                      <> writeSid sid <> charUtf8 ' '
+                      <> intDec (BS.length payload) <> byteString "\r\n"
+                      <> byteString payload <> byteString "\r\n"
+
+-- Msg message with a reply subject.
+writeMessage' (Msg subject sid (Just reply) payload) =
+    byteString "MSG " <> byteString subject <> charUtf8 ' '
+                      <> writeSid sid <> charUtf8 ' '
+                      <> byteString reply <> charUtf8 ' '
+                      <> intDec (BS.length payload) <> byteString "\r\n"
+                      <> byteString payload <> byteString "\r\n"
+
 -- Pub message without a reply subject.
 writeMessage' (Pub subject Nothing payload) =
     byteString "PUB " <> byteString subject <> charUtf8 ' '
