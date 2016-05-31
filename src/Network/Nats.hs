@@ -18,13 +18,14 @@ module Network.Nats
     , writeMessage
     ) where
 
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (threadDelay)
+import Control.Concurrent.Async (Async, async, cancel, waitCatch)
 import Control.Concurrent.STM ( atomically
                               , newTQueueIO
                               , readTQueue
                               , writeTQueue
                               )
-import Control.Exception (throw)
+import Control.Exception (bracket, throw)
 import Control.Monad.IO.Class (liftIO)
 import Data.ByteString (ByteString)
 import Data.Conduit ( Conduit
@@ -38,7 +39,8 @@ import Data.Conduit.Attoparsec ( ParseError
                                , PositionRange
                                , conduitParserEither
                                )
-import Data.Conduit.Network ( appSink
+import Data.Conduit.Network ( AppData
+                            , appSink
                             , appSource
                             , clientSettings
                             , runTCPClient
@@ -67,22 +69,27 @@ import Network.Nats.Writer (writeMessage)
 runNatsClient :: NatsSettings -> NatsURI -> NatsApp a -> IO a
 runNatsClient settings' _uri app = do
     let tcpSettings = clientSettings 4222 "localhost"
-    runTCPClient tcpSettings $ \appData' -> do
-        txQueue' <- newTQueueIO
-        let conn = NatsConnection
-                     { appData  = appData'
-                     , settings = settings'
-                     , txQueue  = txQueue'
-                     }
+    runTCPClient tcpSettings $ \appData' ->
+        bracket (setup appData')
+                teardown
+                (app . fst)
+    where
+      setup :: AppData -> IO (NatsConnection, [ Async () ])
+      setup appData' = do
+          txQueue' <- newTQueueIO
+          let conn = NatsConnection
+                       { appData  = appData'
+                       , settings = settings'
+                       , txQueue  = txQueue'
+                       }
+          (conn,) <$> mapM async [ transmissionPipeline conn
+                                 , receptionPipeline conn
+                                 ]
 
-        -- Start the pipelines in their own threads. The pipelines
-        -- and the threads will terminate when the TCP client closes down.
-        mapM_ forkIO [ transmissionPipeline conn
-                     , receptionPipeline conn
-                     ]
-
-        -- Execute the NatsApp in the caller's thread.
-        app conn
+      teardown :: (NatsConnection, [ Async () ]) -> IO ()
+      teardown (_, xs) = do
+          mapM_ cancel xs
+          mapM_ waitCatch xs
 
 -- | Serialize and enqueue a message for sending. The serialization is
 -- performed by the calling thread.
