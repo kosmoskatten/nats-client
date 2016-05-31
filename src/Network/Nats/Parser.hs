@@ -8,6 +8,7 @@ import Control.Monad (void)
 import Data.Attoparsec.ByteString.Char8
 import Data.ByteString.Char8 (ByteString)
 
+import qualified Data.Attoparsec.ByteString.Char8 as AP
 import qualified Data.ByteString.Char8 as BS
 
 import Network.Nats.Message (Message (..))
@@ -24,6 +25,7 @@ type HandshakeMessageField = (ByteString, HandshakeMessageValue)
 parseMessage :: Parser Message
 parseMessage = infoMessage 
            <|> connectMessage
+           <|> pubMessage
            <|> subMessage
            <|> okMessage 
            <|> errMessage
@@ -76,6 +78,35 @@ parseConnectMessageFields = connectMessageField `sepBy` char ','
                         <|> parseClientName
                         <|> parseClientLang
                         <|> parseVersion
+
+pubMessage :: Parser Message
+pubMessage = do
+    skipSpace
+    pubMessageWithReply <|> pubMessageWithoutReply
+
+pubMessageWithReply :: Parser Message
+pubMessageWithReply = do
+    void $ stringCI "pub "
+    subject <- takeTill isSpace
+    void space
+    reply <- takeTill isSpace
+    void space
+    len <- decimal
+    void $ string "\r\n"
+    payload <- AP.take len
+    void $ string "\r\n"
+    return $ Pub subject (Just reply) payload
+
+pubMessageWithoutReply :: Parser Message
+pubMessageWithoutReply = do
+    void $ stringCI "PUB "
+    subject <- takeTill isSpace
+    void space
+    len <- decimal
+    void $ string "\r\n"
+    payload <- AP.take len
+    void $ string "\r\n"
+    return $ Pub subject Nothing payload
 
 subMessage :: Parser Message
 subMessage = do
