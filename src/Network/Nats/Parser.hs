@@ -33,9 +33,9 @@ parseMessage = infoMessage
 -- | The parsing of the Info message is not performance critical.
 infoMessage :: Parser Message
 infoMessage = do
-    void $ many' space
-    void $ stringCI "info"
-    void space
+    skipSpace
+    msgName "INFO"
+    singleSpace
     void $ char '{'
     fields <- parseInfoMessageFields
     void $ char '}'
@@ -58,12 +58,13 @@ parseInfoMessageFields = infoMessageField `sepBy` char ','
 -- | Nor is the parsing the Connect message performace critical.
 connectMessage :: Parser Message
 connectMessage = do
-    void $ many' space
-    void $ stringCI "connect"
-    void space
+    skipSpace
+    msgName "CONNECT"
+    singleSpace
     void $ char '{'
     fields <- parseConnectMessageFields
-    void $ string "}\r\n"
+    void $ char '}'
+    newLine
     mkConnectMessage fields
 
 parseConnectMessageFields :: Parser [HandshakeMessageField]
@@ -86,67 +87,71 @@ pubMessage = do
 
 pubMessageWithReply :: Parser Message
 pubMessageWithReply = do
-    void $ stringCI "pub "
+    msgName "PUB"
+    singleSpace
     subject <- takeTill isSpace
-    void space
+    singleSpace
     reply <- takeTill isSpace
-    void space
+    singleSpace
     len <- decimal
-    void $ string "\r\n"
+    newLine
     payload <- AP.take len
-    void $ string "\r\n"
+    newLine
     return $ Pub subject (Just reply) payload
 
 pubMessageWithoutReply :: Parser Message
 pubMessageWithoutReply = do
-    void $ stringCI "PUB "
+    msgName "PUB"
+    singleSpace
     subject <- takeTill isSpace
-    void space
+    singleSpace
     len <- decimal
-    void $ string "\r\n"
+    newLine
     payload <- AP.take len
-    void $ string "\r\n"
+    newLine
     return $ Pub subject Nothing payload
 
 subMessage :: Parser Message
 subMessage = do
-    void $ many' space
+    skipSpace
     subMessageWithQueue <|> subMessageWithoutQueue
 
 subMessageWithQueue :: Parser Message
 subMessageWithQueue = do
-    void $ stringCI "sub"
-    void space
+    msgName "SUB"
+    singleSpace
     subject <- takeTill isSpace
-    void space
+    singleSpace
     queue <- takeTill isSpace
-    void space
+    singleSpace
     sid <- Sid <$> takeTill (== '\r')
-    void $ string "\r\n"
+    newLine
     return $ Sub subject (Just queue) sid
     
 subMessageWithoutQueue :: Parser Message
 subMessageWithoutQueue = do
-    void $ stringCI "sub"
-    void space
+    msgName "SUB"
+    singleSpace
     subject <- takeTill isSpace
-    void space
+    singleSpace
     sid <- Sid <$> takeTill (== '\r')
-    void $ string "\r\n"
+    newLine
     return $ Sub subject Nothing sid
 
 okMessage :: Parser Message
 okMessage = do
-    void $ many' space
-    void $ stringCI "+OK\r\n"
+    skipSpace
+    msgName "+OK"
+    newLine
     return Ok
 
 errMessage :: Parser Message
 errMessage = do
-    void $ many' space
-    void $ stringCI "-ERR "
+    skipSpace
+    msgName "-ERR"
+    skipSpace
     pe <- protocolError
-    void $ string "\r\n"
+    newLine
     return $ Err pe
 
 parseServerId :: Parser HandshakeMessageField
@@ -282,4 +287,13 @@ asInt :: Maybe HandshakeMessageValue -> Parser (Maybe Int)
 asInt Nothing            = return Nothing
 asInt (Just (Int value)) = return (Just value)
 asInt _                  = fail "Expected an Int"
+
+singleSpace :: Parser ()
+singleSpace = void space
+
+newLine :: Parser ()
+newLine = void $ string "\r\n"
+
+msgName :: ByteString -> Parser ()
+msgName = void . stringCI
 
