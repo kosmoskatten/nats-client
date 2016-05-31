@@ -26,6 +26,7 @@ import Control.Concurrent.STM ( atomically
                               , writeTQueue
                               )
 import Control.Exception (bracket, throw)
+import Control.Monad (forever)
 import Control.Monad.IO.Class (liftIO)
 import Data.ByteString (ByteString)
 import Data.Conduit ( Conduit
@@ -100,22 +101,20 @@ enqueueMessage NatsConnection {..} msg = do
 
 transmissionPipeline :: NatsConnection -> IO ()
 transmissionPipeline NatsConnection {..} = do
-    let sink = appSink appData
-    chunkSource =$= streamLogger $$ sink
+    let netSink = appSink appData
+    stmSource =$= streamLogger $$ netSink
     where
-      chunkSource :: Source IO ByteString
-      chunkSource = do
-          chunk <- liftIO $ atomically (readTQueue txQueue)
-          yield chunk
-          chunkSource
+      stmSource :: Source IO ByteString
+      stmSource = 
+          forever $ (liftIO $ atomically (readTQueue txQueue)) >>= yield
 
 -- | The reception pipeline. A stream of data from the source (produce
 -- ByteStrings from the socket), to the parser (produce messages) and
 -- finally to the messageSink and the message handler.
 receptionPipeline :: NatsConnection -> IO ()
 receptionPipeline conn = do
-    let source = appSource $ appData conn
-    source =$= streamLogger =$= conduitParserEither parseMessage 
+    let netSource = appSource $ appData conn
+    netSource =$= streamLogger =$= conduitParserEither parseMessage 
         $$ messageSink
     where
       messageSink :: Sink (Either ParseError (PositionRange, Message)) IO ()
