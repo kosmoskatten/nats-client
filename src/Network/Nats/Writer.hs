@@ -10,7 +10,6 @@ import Data.ByteString.Builder
 import Data.Monoid ((<>))
 import Data.List (foldl', intersperse)
 
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
 
 import Network.Nats.Message (Message (..))
@@ -81,29 +80,29 @@ writeMessage' Connect {..} =
 writeMessage' (Msg subject sid Nothing payload) =
     byteString "MSG " <> byteString subject <> charUtf8 ' '
                       <> writeSid sid <> charUtf8 ' '
-                      <> intDec (BS.length payload) <> byteString "\r\n"
-                      <> byteString payload <> byteString "\r\n"
+                      <> int64Dec (LBS.length payload) <> byteString "\r\n"
+                      <> lazyByteString payload <> byteString "\r\n"
 
 -- Msg message with a reply subject.
 writeMessage' (Msg subject sid (Just reply) payload) =
     byteString "MSG " <> byteString subject <> charUtf8 ' '
                       <> writeSid sid <> charUtf8 ' '
                       <> byteString reply <> charUtf8 ' '
-                      <> intDec (BS.length payload) <> byteString "\r\n"
-                      <> byteString payload <> byteString "\r\n"
+                      <> int64Dec (LBS.length payload) <> byteString "\r\n"
+                      <> lazyByteString payload <> byteString "\r\n"
 
 -- Pub message without a reply subject.
 writeMessage' (Pub subject Nothing payload) =
     byteString "PUB " <> byteString subject <> charUtf8 ' '
-                      <> intDec (BS.length payload) <> byteString "\r\n"
-                      <> byteString payload <> byteString "\r\n"
+                      <> int64Dec (LBS.length payload) <> byteString "\r\n"
+                      <> lazyByteString payload <> byteString "\r\n"
 
 -- Pub message with a reply subject.
 writeMessage' (Pub subject (Just reply) payload) =
     byteString "PUB " <> byteString subject <> charUtf8 ' '
                       <> byteString reply <> charUtf8 ' '
-                      <> intDec (BS.length payload) <> byteString "\r\n"
-                      <> byteString payload <> byteString "\r\n"
+                      <> int64Dec (LBS.length payload) <> byteString "\r\n"
+                      <> lazyByteString payload <> byteString "\r\n"
 
 -- Sub message without a queue group.
 writeMessage' (Sub subject Nothing sid) =

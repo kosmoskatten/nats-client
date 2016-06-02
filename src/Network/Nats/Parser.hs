@@ -10,6 +10,7 @@ import Data.ByteString.Char8 (ByteString)
 
 import qualified Data.Attoparsec.ByteString.Char8 as AP
 import qualified Data.ByteString.Char8 as BS
+import qualified Data.ByteString.Lazy.Char8 as LBS
 
 import Network.Nats.Message (Message (..))
 import Network.Nats.Types (ProtocolError (..), SubscriptionId (..))
@@ -98,7 +99,7 @@ msgMessageWithReply = do
     singleSpace
     len <- decimal
     newLine
-    payload <- AP.take len
+    payload <- LBS.fromStrict <$> AP.take len
     newLine
     return $ Msg subject sid (Just reply) payload
 
@@ -112,7 +113,7 @@ msgMessageWithoutReply = do
     singleSpace
     len <- decimal
     newLine
-    payload <- AP.take len
+    payload <- LBS.fromStrict <$> AP.take len
     newLine
     return $ Msg subject sid Nothing payload
 
@@ -131,7 +132,7 @@ pubMessageWithReply = do
     singleSpace
     len <- decimal
     newLine
-    payload <- AP.take len
+    payload <- LBS.fromStrict <$> AP.take len
     newLine
     return $ Pub subject (Just reply) payload
 
@@ -143,7 +144,7 @@ pubMessageWithoutReply = do
     singleSpace
     len <- decimal
     newLine
-    payload <- AP.take len
+    payload <- LBS.fromStrict <$> AP.take len
     newLine
     return $ Pub subject Nothing payload
 

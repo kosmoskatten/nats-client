@@ -2,7 +2,8 @@ module Network.Nats.Message
     ( Message (..)
     ) where
 
-import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 
 import Network.Nats.Types (ProtocolError, SubscriptionId)
 
@@ -16,13 +17,13 @@ data Message =
     -- security requirements that are necessary for the client to
     -- successfully authenticate with the server and
     -- exchange messages.
-    Info { serverId           :: !(Maybe ByteString)
+    Info { serverId           :: !(Maybe BS.ByteString)
            -- ^ The unique identifier of the NATS server.
-         , serverVersion      :: !(Maybe ByteString)
+         , serverVersion      :: !(Maybe BS.ByteString)
            -- ^ The version of the NATS server.
-         , goVersion          :: !(Maybe ByteString)
+         , goVersion          :: !(Maybe BS.ByteString)
            -- ^ The version of golang the server was built with.
-         , serverHost         :: !(Maybe ByteString)
+         , serverHost         :: !(Maybe BS.ByteString)
            -- ^ The IP address of the NATS server host.
          , serverPort         :: !(Maybe Int)
            -- ^ The port number the NATS server is configured to listen on.
@@ -48,17 +49,17 @@ data Message =
               -- ^ Turns on additional strict format checking.
             , clientSslRequired :: !(Maybe Bool)
               -- ^ Indicates whether the client requires an SSL connection.
-            , clientAuthToken   :: !(Maybe ByteString)
+            , clientAuthToken   :: !(Maybe BS.ByteString)
               -- ^ Client authorization token.
-            , clientUser        :: !(Maybe ByteString)
+            , clientUser        :: !(Maybe BS.ByteString)
               -- ^ Connection username (if auth_required is set).
-            , clientPass        :: !(Maybe ByteString)
+            , clientPass        :: !(Maybe BS.ByteString)
               -- ^ Connection password (if auth_required is set).
-            , clientName        :: !(Maybe ByteString)
+            , clientName        :: !(Maybe BS.ByteString)
               -- ^ Optional client name.
-            , clientLang        :: !(Maybe ByteString)
+            , clientLang        :: !(Maybe BS.ByteString)
               -- The implementation of the client.
-            , clientVersion     :: !(Maybe ByteString)
+            , clientVersion     :: !(Maybe BS.ByteString)
               -- ^ The version of the client.
             }
 
@@ -69,7 +70,8 @@ data Message =
     -- for responses.
     -- #bytes: Implicit by the length of the payload.
     -- payload: The message payload data.
-  | Msg !ByteString !SubscriptionId !(Maybe ByteString) !ByteString
+  | Msg !BS.ByteString !SubscriptionId !(Maybe BS.ByteString) 
+        !LBS.ByteString
 
     -- | The Pub message publishes the message payload to the given
     -- subject name. If a reply subject is supplied, it will be
@@ -80,7 +82,7 @@ data Message =
     -- send a response back to the publisher/requestor.
     -- #bytes: Implicit by the length of payload.
     -- payload: The message payload data.
-  | Pub !ByteString !(Maybe ByteString) !ByteString
+  | Pub !BS.ByteString !(Maybe BS.ByteString) !LBS.ByteString
 
     -- | The Sub message initiates a subscription to a subject,
     -- optionally joining a distributed queue group.
@@ -88,7 +90,7 @@ data Message =
     -- (Optional) queue group: If specified, the subscriper will join 
     -- this queue group.
     -- sid: A unique alphanumeric SubscriptionId.
-  | Sub !ByteString !(Maybe ByteString) !SubscriptionId
+  | Sub !BS.ByteString !(Maybe BS.ByteString) !SubscriptionId
 
     -- | When the verbose (clientVerbose) option is set to true, the
     -- server acknowledges each well-formed prototol message from the

@@ -7,7 +7,7 @@ module Network.NatsTests
 
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import Control.Monad (void)
-import Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Lazy.Char8 (ByteString)
 import System.Timeout (timeout)
 import Test.HUnit
 

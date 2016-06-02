@@ -65,13 +65,13 @@ arbitraryMsg :: Gen Message
 arbitraryMsg = Msg <$> alnumString
                    <*> (Sid <$> alnumString)
                    <*> perhaps alnumString
-                   <*> valueString
+                   <*> payloadString
 
 -- | Arbitrary generation of Pub messages.
 arbitraryPub :: Gen Message
 arbitraryPub = Pub <$> alnumString
                    <*> perhaps alnumString
-                   <*> valueString
+                   <*> payloadString
 
 -- | Arbitrary generation of Sub messages.
 arbitrarySub :: Gen Message
@@ -111,6 +111,9 @@ valueString =
     where
       selection :: [Char]
       selection = ['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ "+-_!?*(){} "
+
+payloadString :: Gen LBS.ByteString
+payloadString = LBS.pack <$> listOf arbitrary
 
 -- | Generate a non-empty ByteString which is plain alphanumeric.
 alnumString :: Gen ByteString

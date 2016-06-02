@@ -37,7 +37,6 @@ import Control.Concurrent.STM ( atomically
 import Control.Exception (bracket, throw)
 import Control.Monad (forever, void)
 import Control.Monad.IO.Class (liftIO)
-import Data.ByteString (ByteString)
 import Data.Conduit ( Conduit
                     , Sink
                     , Source
@@ -57,7 +56,7 @@ import Data.Conduit.Network ( AppData
                             )
 
 import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Lazy.Char8 as LBS
 import qualified Data.Map.Lazy as Map
 
 import Network.Nats.Message (Message (..))
@@ -80,7 +79,7 @@ import Network.Nats.Types ( NatsApp
                           )
 import Network.Nats.Writer (writeMessage)
 
-subscribeAsync :: NatsConnection -> ByteString -> NatsSubscriber
+subscribeAsync :: NatsConnection -> BS.ByteString -> NatsSubscriber
                -> IO SubscriptionId
 subscribeAsync conn@NatsConnection {..} topic subscriber = do
     sid <- newSubscriptionId
@@ -89,7 +88,7 @@ subscribeAsync conn@NatsConnection {..} topic subscriber = do
     enqueueMessage conn $ Sub topic Nothing sid
     return sid
 
-subscribeSync :: NatsConnection -> ByteString -> IO NatsQueue
+subscribeSync :: NatsConnection -> BS.ByteString -> IO NatsQueue
 subscribeSync conn@NatsConnection {..} topic = do
     sid   <- newSubscriptionId
     queue <- newTQueueIO
@@ -101,7 +100,7 @@ subscribeSync conn@NatsConnection {..} topic = do
 nextMsg :: NatsQueue -> IO NatsMsg
 nextMsg (NatsQueue queue) = atomically $ readTQueue queue
 
-publish :: NatsConnection -> ByteString -> ByteString -> IO ()
+publish :: NatsConnection -> BS.ByteString -> LBS.ByteString -> IO ()
 publish conn topic payload =
     enqueueMessage conn $ Pub topic Nothing payload
 
@@ -146,7 +145,7 @@ transmissionPipeline NatsConnection {..} = do
     let netSink = appSink appData
     stmSource =$= streamLogger $$ netSink
     where
-      stmSource :: Source IO ByteString
+      stmSource :: Source IO BS.ByteString
       stmSource = 
           forever $ (liftIO $ atomically (readTQueue txQueue)) >>= yield
 
@@ -208,7 +207,7 @@ mkConnectMessage NatsSettings {..} Info {..} =
             }
 mkConnectMessage _ _ = error "Must be an Info record."
 
-streamLogger :: Conduit ByteString IO ByteString
+streamLogger :: Conduit BS.ByteString IO BS.ByteString
 streamLogger = 
     awaitForever $ \str -> do
         liftIO $ BS.putStrLn str
