@@ -18,11 +18,14 @@ module Network.Nats
     , writeMessage
     ) where
 
-import Control.Concurrent (threadDelay)
+import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.Async (Async, async, cancel, waitCatch)
 import Control.Concurrent.STM ( atomically
+                              , modifyTVar
                               , newTQueueIO
+                              , newTVarIO
                               , readTQueue
+                              , readTVarIO
                               , writeTQueue
                               )
 import Control.Exception (bracket, throw)
@@ -49,11 +52,14 @@ import Data.Conduit.Network ( AppData
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.Map.Lazy as Map
 
 import Network.Nats.Message (Message (..))
 import Network.Nats.Parser (parseMessage)
 import Network.Nats.Types ( NatsApp
                           , NatsURI
+                          , NatsSubscriber
+                          , Subscription (..)
                           , NatsConnection (..)
                           , NatsException (..)
                           , NatsSettings (..)
@@ -62,8 +68,20 @@ import Network.Nats.Types ( NatsApp
                           , defaultSettings
                           , isFatalError
                           , newSubscriptionId
+                          , emptySubscriptionMap
                           )
 import Network.Nats.Writer (writeMessage)
+
+subscribeAsync :: NatsConnection -> ByteString -> NatsSubscriber -> IO ()
+subscribeAsync conn@NatsConnection {..} topic subscriber = do
+    sid <- newSubscriptionId
+    atomically (modifyTVar subscribers $ 
+        Map.insert sid (AsyncSubscription subscriber))
+    enqueueMessage conn $ Sub topic Nothing sid
+
+publish :: NatsConnection -> ByteString -> ByteString -> IO ()
+publish conn topic payload =
+    enqueueMessage conn $ Pub topic Nothing payload
 
 -- | Run the Nats client given the settings and connection URI. Once
 -- the NatsApp has terminated its execution the connection is closed.
@@ -77,11 +95,13 @@ runNatsClient settings' _uri app = do
     where
       setup :: AppData -> IO (NatsConnection, [ Async () ])
       setup appData' = do
-          txQueue' <- newTQueueIO
+          txQueue'     <- newTQueueIO
+          subscribers' <- newTVarIO emptySubscriptionMap
           let conn = NatsConnection
-                       { appData  = appData'
-                       , settings = settings'
-                       , txQueue  = txQueue'
+                       { appData     = appData'
+                       , settings    = settings'
+                       , txQueue     = txQueue'
+                       , subscribers = subscribers'
                        }
           (conn,) <$> mapM async [ transmissionPipeline conn
                                  , receptionPipeline conn
@@ -126,6 +146,13 @@ receptionPipeline conn = do
 -- | Handle the semantic actions for one received message.
 handleMessage :: NatsConnection -> Message -> IO ()
 
+-- | Handle a Msg message. Dispatch the message to the subscriber.
+handleMessage NatsConnection {..} (Msg topic sid reply payload) = do
+    subscribers' <- readTVarIO subscribers
+    maybe (return ()) (\(AsyncSubscription subscr) ->
+        forkIO (subscr (topic, sid, reply, payload)) >> return ())
+        (Map.lookup sid subscribers')
+
 -- | Handle an Info message. Just produce and enqueue a Connect message.
 handleMessage conn@NatsConnection {..} msg@Info {..} =
     enqueueMessage conn $ mkConnectMessage settings msg
@@ -157,9 +184,8 @@ delayApp sec _ = threadDelay $ sec * 1000000
 
 subscribeApp :: NatsConnection -> IO ()
 subscribeApp conn = do
-    sid <- newSubscriptionId
-    enqueueMessage conn (Sub "foo" Nothing sid)
-    enqueueMessage conn (Pub "foo" Nothing "Hello, NATS!")
+    subscribeAsync conn "foo" $ \(_, _, _, payload) -> BS.putStrLn payload
+    publish conn "foo" "Hello!"
     threadDelay 5000000
 
 streamLogger :: Conduit ByteString IO ByteString

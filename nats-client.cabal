@@ -26,6 +26,7 @@ library
                      , bytestring
                      , conduit
                      , conduit-extra
+                     , containers
                      , random
                      , stm
                      , transformers
