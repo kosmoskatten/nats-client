@@ -6,7 +6,7 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.Providers.HUnit (testCase)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 
-import Network.NatsTests (connectToServer)
+import Network.NatsTests (asyncSubscribeSingleMsg)
 import Network.Nats.MessageProps (encodeDecodeMessage)
 
 main :: IO ()
@@ -19,7 +19,7 @@ testSuite =
                        encodeDecodeMessage
         ]
     , testGroup "Client tests (using real server)"
-        [ testCase "Successfully connect to the server"
-                   connectToServer
+        [ testCase "Successfully subscribe and receive one async message"
+                   asyncSubscribeSingleMsg
         ]
     ]

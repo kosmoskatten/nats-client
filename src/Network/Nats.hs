@@ -7,8 +7,11 @@ module Network.Nats
     , NatsSettings (..)
     , NatsApp
     , NatsURI
+    , NatsSubscriber
     , SubscriptionId (..)
     , defaultSettings
+    , subscribeAsync
+    , publish
     , runNatsClient
 
     -- For debugging purposes the parser/writer is exported.
@@ -18,7 +21,7 @@ module Network.Nats
     , writeMessage
     ) where
 
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (forkIO)
 import Control.Concurrent.Async (Async, async, cancel, waitCatch)
 import Control.Concurrent.STM ( atomically
                               , modifyTVar
@@ -72,12 +75,14 @@ import Network.Nats.Types ( NatsApp
                           )
 import Network.Nats.Writer (writeMessage)
 
-subscribeAsync :: NatsConnection -> ByteString -> NatsSubscriber -> IO ()
+subscribeAsync :: NatsConnection -> ByteString -> NatsSubscriber
+               -> IO SubscriptionId
 subscribeAsync conn@NatsConnection {..} topic subscriber = do
     sid <- newSubscriptionId
     atomically (modifyTVar subscribers $ 
         Map.insert sid (AsyncSubscription subscriber))
     enqueueMessage conn $ Sub topic Nothing sid
+    return sid
 
 publish :: NatsConnection -> ByteString -> ByteString -> IO ()
 publish conn topic payload =
@@ -178,15 +183,6 @@ mkConnectMessage NatsSettings {..} Info {..} =
             , clientVersion     = Just "0.1.0.0"
             }
 mkConnectMessage _ _ = error "Must be an Info record."
-
-delayApp :: Int -> NatsConnection -> IO ()
-delayApp sec _ = threadDelay $ sec * 1000000
-
-subscribeApp :: NatsConnection -> IO ()
-subscribeApp conn = do
-    subscribeAsync conn "foo" $ \(_, _, _, payload) -> BS.putStrLn payload
-    publish conn "foo" "Hello!"
-    threadDelay 5000000
 
 streamLogger :: Conduit ByteString IO ByteString
 streamLogger = 
