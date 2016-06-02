@@ -8,9 +8,12 @@ module Network.Nats
     , NatsApp
     , NatsURI
     , NatsSubscriber
+    , NatsQueue
     , SubscriptionId (..)
     , defaultSettings
     , subscribeAsync
+    , subscribeSync
+    , nextMsg
     , publish
     , runNatsClient
 
@@ -32,7 +35,7 @@ import Control.Concurrent.STM ( atomically
                               , writeTQueue
                               )
 import Control.Exception (bracket, throw)
-import Control.Monad (forever)
+import Control.Monad (forever, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.ByteString (ByteString)
 import Data.Conduit ( Conduit
@@ -61,9 +64,11 @@ import Network.Nats.Message (Message (..))
 import Network.Nats.Parser (parseMessage)
 import Network.Nats.Types ( NatsApp
                           , NatsURI
+                          , NatsMsg
                           , NatsSubscriber
                           , Subscription (..)
                           , NatsConnection (..)
+                          , NatsQueue (..)
                           , NatsException (..)
                           , NatsSettings (..)
                           , ProtocolError (..)
@@ -79,10 +84,22 @@ subscribeAsync :: NatsConnection -> ByteString -> NatsSubscriber
                -> IO SubscriptionId
 subscribeAsync conn@NatsConnection {..} topic subscriber = do
     sid <- newSubscriptionId
-    atomically (modifyTVar subscribers $ 
+    atomically (modifyTVar subscriptions $ 
         Map.insert sid (AsyncSubscription subscriber))
     enqueueMessage conn $ Sub topic Nothing sid
     return sid
+
+subscribeSync :: NatsConnection -> ByteString -> IO NatsQueue
+subscribeSync conn@NatsConnection {..} topic = do
+    sid   <- newSubscriptionId
+    queue <- newTQueueIO
+    atomically (modifyTVar subscriptions $
+        Map.insert sid (SyncSubscription queue))
+    enqueueMessage conn $ Sub topic Nothing sid
+    return $ NatsQueue queue
+
+nextMsg :: NatsQueue -> IO NatsMsg
+nextMsg (NatsQueue queue) = atomically $ readTQueue queue
 
 publish :: NatsConnection -> ByteString -> ByteString -> IO ()
 publish conn topic payload =
@@ -100,13 +117,13 @@ runNatsClient settings' _uri app = do
     where
       setup :: AppData -> IO (NatsConnection, [ Async () ])
       setup appData' = do
-          txQueue'     <- newTQueueIO
-          subscribers' <- newTVarIO emptySubscriptionMap
+          txQueue'       <- newTQueueIO
+          subscriptions' <- newTVarIO emptySubscriptionMap
           let conn = NatsConnection
-                       { appData     = appData'
-                       , settings    = settings'
-                       , txQueue     = txQueue'
-                       , subscribers = subscribers'
+                       { appData       = appData'
+                       , settings      = settings'
+                       , txQueue       = txQueue'
+                       , subscriptions = subscriptions'
                        }
           (conn,) <$> mapM async [ transmissionPipeline conn
                                  , receptionPipeline conn
@@ -153,10 +170,9 @@ handleMessage :: NatsConnection -> Message -> IO ()
 
 -- | Handle a Msg message. Dispatch the message to the subscriber.
 handleMessage NatsConnection {..} (Msg topic sid reply payload) = do
-    subscribers' <- readTVarIO subscribers
-    maybe (return ()) (\(AsyncSubscription subscr) ->
-        forkIO (subscr (topic, sid, reply, payload)) >> return ())
-        (Map.lookup sid subscribers')
+    subscriptions' <- readTVarIO subscriptions
+    maybe (return ()) (deliverSubscription (topic, sid, reply, payload))
+        (Map.lookup sid subscriptions')
 
 -- | Handle an Info message. Just produce and enqueue a Connect message.
 handleMessage conn@NatsConnection {..} msg@Info {..} =
@@ -168,6 +184,14 @@ handleMessage _ (Err pe)
     | otherwise       = return ()
 
 handleMessage _conn _msg = putStrLn "Got something else."
+
+-- | Deliver a message to a subscriber.
+deliverSubscription :: NatsMsg -> Subscription -> IO ()
+deliverSubscription msg (AsyncSubscription subscr) =
+    void $ forkIO (subscr msg)
+
+deliverSubscription msg (SyncSubscription queue) =
+    atomically $ writeTQueue queue msg
 
 -- | Given the settings and the Info record, produce a Connect record.
 mkConnectMessage :: NatsSettings -> Message -> Message

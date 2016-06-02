@@ -4,6 +4,8 @@ module Network.Nats.Types
     , NatsURI
     , NatsMsg
     , NatsSubscriber
+    , NatsQueue (..)
+    , Subscriptions
     , Subscription (..)
     , NatsConnection (..)
     , NatsException (..)
@@ -40,23 +42,27 @@ type NatsMsg = (ByteString, SubscriptionId, Maybe ByteString, ByteString)
 
 type NatsSubscriber = (NatsMsg -> IO ())
 
-data Subscription = AsyncSubscription !NatsSubscriber
+data Subscription 
+  = AsyncSubscription !NatsSubscriber
+  | SyncSubscription !(TQueue NatsMsg)
 
-type Subscribers = Map SubscriptionId Subscription
+type Subscriptions = Map SubscriptionId Subscription
+
+data NatsQueue = NatsQueue !(TQueue NatsMsg)
 
 -- | The context needed to maintain one NATS connection. Content is opaque
 -- to the user.
 data NatsConnection = NatsConnection
-    { appData     :: !AppData
+    { appData       :: !AppData
       -- ^ Stuff gotten from the TCP client, e.g. the source and sink
       -- network conduits.
-    , settings    :: !NatsSettings
+    , settings      :: !NatsSettings
       -- ^ The user provided settings for establishing the connection.
-    , txQueue     :: !(TQueue ByteString)
+    , txQueue       :: !(TQueue ByteString)
       -- ^ The queue of data (as ByteStrings) to be transmitted.
 
-    , subscribers :: !(TVar Subscribers)
-      -- ^ The registered subscribers.
+    , subscriptions :: !(TVar Subscriptions)
+      -- ^ The map of subscriptions.
     }
 
 -- | Exception to be thrown from the Nats client.
@@ -119,6 +125,6 @@ newSubscriptionId =
       characters :: BS.ByteString
       characters = "abcdefghijklmnopqrtsuvwxyz0123456789"
 
-emptySubscriptionMap :: Subscribers
+emptySubscriptionMap :: Subscriptions
 emptySubscriptionMap = Map.empty
 

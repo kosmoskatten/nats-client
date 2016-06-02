@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Network.NatsTests
     ( asyncSubscribeSingleMsg
+    , syncSubscribeSingleMsg
     ) where
 
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
@@ -24,7 +25,16 @@ asyncSubscribeSingleMsg =
       handler :: MVar (SubscriptionId, ByteString) -> NatsSubscriber
       handler sync (_, sid, _, payload) = putMVar sync (sid, payload)
 
+syncSubscribeSingleMsg :: Assertion
+syncSubscribeSingleMsg =
+    void $ runNatsClient natsSettings "" $ \conn -> do
+        queue <- subscribeSync conn "foo"
+        publish conn "foo" "Hello sync world!"
+
+        (_, _, _, value) <- nextMsg queue
+        assertEqual "Shall be equal" "Hello sync world!" value
+
 natsSettings :: NatsSettings
 natsSettings = defaultSettings { verbose  = True
                                , pedantic = True
-}
+                               }

@@ -6,7 +6,9 @@ import Test.Framework (Test, defaultMain, testGroup)
 import Test.Framework.Providers.HUnit (testCase)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 
-import Network.NatsTests (asyncSubscribeSingleMsg)
+import Network.NatsTests ( asyncSubscribeSingleMsg
+                         , syncSubscribeSingleMsg
+                         )
 import Network.Nats.MessageProps (encodeDecodeMessage)
 
 main :: IO ()
@@ -21,5 +23,7 @@ testSuite =
     , testGroup "Client tests (using real server)"
         [ testCase "Successfully subscribe and receive one async message"
                    asyncSubscribeSingleMsg
+        , testCase "Successfully subscribe and receive one sync message"
+                   syncSubscribeSingleMsg
         ]
     ]
