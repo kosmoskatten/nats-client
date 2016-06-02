@@ -159,6 +159,7 @@ subscribeApp :: NatsConnection -> IO ()
 subscribeApp conn = do
     sid <- newSubscriptionId
     enqueueMessage conn (Sub "foo" Nothing sid)
+    enqueueMessage conn (Pub "foo" Nothing "Hello, NATS!")
     threadDelay 5000000
 
 streamLogger :: Conduit ByteString IO ByteString
