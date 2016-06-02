@@ -8,6 +8,7 @@ import Test.Framework.Providers.QuickCheck2 (testProperty)
 
 import Network.NatsTests ( asyncSubscribeSingleMsg
                          , syncSubscribeSingleMsg
+                         , syncSubscribeSeveralMsgWithTmo
                          )
 import Network.Nats.MessageProps (encodeDecodeMessage)
 
@@ -21,9 +22,11 @@ testSuite =
                        encodeDecodeMessage
         ]
     , testGroup "Client tests (using real server)"
-        [ testCase "Successfully subscribe and receive one async message"
+        [ testCase "Successfully subscribe and receive one async msgs"
                    asyncSubscribeSingleMsg
-        , testCase "Successfully subscribe and receive one sync message"
+        , testCase "Successfully subscribe and receive one sync msgs"
                    syncSubscribeSingleMsg
+        , testCase "Successfully subscribe and receive several sync msgs"
+                   syncSubscribeSeveralMsgWithTmo
         ]
     ]
