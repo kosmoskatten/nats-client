@@ -13,7 +13,8 @@ import Data.List (foldl', intersperse)
 import qualified Data.ByteString.Lazy as LBS
 
 import Network.Nats.Message (Message (..))
-import Network.Nats.Types (ProtocolError (..), SubscriptionId (..))
+import Network.Nats.Types (ProtocolError (..))
+import Network.Nats.Subscriber (SubscriptionId (..))
 
 -- | Existentially quantified Field type, to allow for a polymorph
 -- list of Fields. All fields with the contraint of beeing Writeable.

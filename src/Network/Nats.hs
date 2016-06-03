@@ -2,20 +2,18 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
 module Network.Nats
-    ( NatsConnection
+    ( Connection
+    , Settings (..)
+    , NatsMsg (..)
     , NatsException (..)
-    , NatsSettings (..)
-    , NatsApp
     , NatsURI
-    , NatsSubscriber
-    , NatsQueue
     , SubscriptionId (..)
     , defaultSettings
-    , subscribeAsync
-    , subscribeSync
+    , subAsync
+    , subQueue
     , nextMsg
-    , publish
-    , publishJSON
+    , pub
+    , pubJson
     , runNatsClient
 
     -- For debugging purposes the parser/writer is exported.
@@ -59,61 +57,68 @@ import Data.Conduit.Network ( AppData
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
-import qualified Data.Map.Lazy as Map
 
+import Network.Nats.Connection ( Connection (..)
+                               , Settings (..)
+                               , defaultSettings
+                               )
 import Network.Nats.Message (Message (..))
 import Network.Nats.Parser (parseMessage)
 import Network.Nats.Types ( Topic 
                           , Payload
-                          , NatsApp
                           , NatsURI
-                          , NatsMsg
-                          , NatsSubscriber
-                          , Subscription (..)
-                          , NatsConnection (..)
-                          , NatsQueue (..)
                           , NatsException (..)
-                          , NatsSettings (..)
                           , ProtocolError (..)
-                          , SubscriptionId (..)
-                          , defaultSettings
                           , isFatalError
-                          , newSubscriptionId
-                          , emptySubscriptionMap
                           )
+import Network.Nats.Subscriber ( NatsMsg (..)
+                               , MsgQueue (..)
+                               , Subscriber (..)
+                               , SubscriptionId (..)
+                               , empty
+                               , addSubscriber
+                               , lookupSubscriber
+                               , newSubscriptionId
+                               )
 import Network.Nats.Writer (writeMessage)
 
-subscribeAsync :: NatsConnection -> Topic -> NatsSubscriber
-               -> IO SubscriptionId
-subscribeAsync conn@NatsConnection {..} topic subscriber = do
+-- | Subscribe on a Topic with an asyncronous action to handle
+-- messages sent to this Topic. The asyncronous action will be
+-- executed in a new thread.
+subAsync :: Connection -> Topic -> (NatsMsg -> IO ()) -> IO SubscriptionId
+subAsync conn@Connection {..} topic action = do
     sid <- newSubscriptionId
-    atomically (modifyTVar subscriptions $ 
-        Map.insert sid (AsyncSubscription subscriber))
+    atomically (modifyTVar subscribers $ 
+        addSubscriber sid (AsyncSubscriber action))
     enqueueMessage conn $ Sub topic Nothing sid
     return sid
 
-subscribeSync :: NatsConnection -> Topic -> IO NatsQueue
-subscribeSync conn@NatsConnection {..} topic = do
+-- | Subscribe to a Topic where the messages are put to a MsgQueue.
+subQueue :: Connection -> Topic -> IO MsgQueue
+subQueue conn@Connection {..} topic = do
     sid   <- newSubscriptionId
     queue <- newTQueueIO
-    atomically (modifyTVar subscriptions $
-        Map.insert sid (SyncSubscription queue))
+    atomically (modifyTVar subscribers $
+        addSubscriber sid (QueueSubscriber queue))
     enqueueMessage conn $ Sub topic Nothing sid
-    return $ NatsQueue queue
+    return $ MsgQueue queue
 
-nextMsg :: NatsQueue -> IO NatsMsg
-nextMsg (NatsQueue queue) = atomically $ readTQueue queue
+-- | Read the next message from the MsgQueue. The call is blocking
+-- until a message arrives or interrupted by System.Timeout.timeout.
+nextMsg :: MsgQueue -> IO NatsMsg
+nextMsg (MsgQueue queue) = atomically $ readTQueue queue
 
-publish :: NatsConnection -> Topic -> Payload -> IO ()
-publish conn topic payload =
-    enqueueMessage conn $ Pub topic Nothing payload
+-- | Publish a message to a Topic.
+pub :: Connection -> Topic -> Payload -> IO ()
+pub conn topic payload = enqueueMessage conn $ Pub topic Nothing payload
 
-publishJSON :: ToJSON a => NatsConnection -> Topic -> a -> IO ()
-publishJSON conn topic = publish conn topic . encode
+-- | Publish a JSON message to a Topic.
+pubJson :: ToJSON a => Connection -> Topic -> a -> IO ()
+pubJson conn topic = pub conn topic . encode
 
 -- | Run the Nats client given the settings and connection URI. Once
 -- the NatsApp has terminated its execution the connection is closed.
-runNatsClient :: NatsSettings -> NatsURI -> NatsApp a -> IO a
+runNatsClient :: Settings -> NatsURI -> (Connection -> IO a) -> IO a
 runNatsClient settings' _uri app = do
     let tcpSettings = clientSettings 4222 "localhost"
     runTCPClient tcpSettings $ \appData' ->
@@ -121,34 +126,34 @@ runNatsClient settings' _uri app = do
                 teardown
                 (app . fst)
     where
-      setup :: AppData -> IO (NatsConnection, [ Async () ])
+      setup :: AppData -> IO (Connection, [ Async () ])
       setup appData' = do
-          txQueue'       <- newTQueueIO
-          subscriptions' <- newTVarIO emptySubscriptionMap
-          let conn = NatsConnection
-                       { appData       = appData'
-                       , settings      = settings'
-                       , txQueue       = txQueue'
-                       , subscriptions = subscriptions'
+          txQueue'     <- newTQueueIO
+          subscribers' <- newTVarIO empty
+          let conn = Connection
+                       { appData     = appData'
+                       , settings    = settings'
+                       , txQueue     = txQueue'
+                       , subscribers = subscribers'
                        }
           (conn,) <$> mapM async [ transmissionPipeline conn
                                  , receptionPipeline conn
                                  ]
 
-      teardown :: (NatsConnection, [ Async () ]) -> IO ()
+      teardown :: (Connection, [ Async () ]) -> IO ()
       teardown (_, xs) = do
           mapM_ cancel xs
           mapM_ waitCatch xs
 
 -- | Serialize and enqueue a message for sending. The serialization is
 -- performed by the calling thread.
-enqueueMessage :: NatsConnection -> Message -> IO ()
-enqueueMessage NatsConnection {..} msg = do
+enqueueMessage :: Connection -> Message -> IO ()
+enqueueMessage Connection {..} msg = do
     let chunks = LBS.toChunks $ writeMessage msg
     atomically $ mapM_ (writeTQueue txQueue) chunks
 
-transmissionPipeline :: NatsConnection -> IO ()
-transmissionPipeline NatsConnection {..} = do
+transmissionPipeline :: Connection -> IO ()
+transmissionPipeline Connection {..} = do
     let netSink = appSink appData
     stmSource =$= streamLogger $$ netSink
     where
@@ -159,7 +164,7 @@ transmissionPipeline NatsConnection {..} = do
 -- | The reception pipeline. A stream of data from the source (produce
 -- ByteStrings from the socket), to the parser (produce messages) and
 -- finally to the messageSink and the message handler.
-receptionPipeline :: NatsConnection -> IO ()
+receptionPipeline :: Connection -> IO ()
 receptionPipeline conn = do
     let netSource = appSource $ appData conn
     netSource =$= streamLogger =$= conduitParserEither parseMessage 
@@ -172,16 +177,17 @@ receptionPipeline conn = do
             Left err       -> liftIO $ print err
             
 -- | Handle the semantic actions for one received message.
-handleMessage :: NatsConnection -> Message -> IO ()
+handleMessage :: Connection -> Message -> IO ()
 
 -- | Handle a Msg message. Dispatch the message to the subscriber.
-handleMessage NatsConnection {..} (Msg topic sid reply payload) = do
-    subscriptions' <- readTVarIO subscriptions
-    maybe (return ()) (deliverSubscription (topic, sid, reply, payload))
-        (Map.lookup sid subscriptions')
+handleMessage Connection {..} (Msg topic sid reply payload) = do
+    subscribers' <- readTVarIO subscribers
+    maybe (return ()) 
+          (deliverSubscription $ NatsMsg topic sid reply payload)
+          (lookupSubscriber sid subscribers')
 
 -- | Handle an Info message. Just produce and enqueue a Connect message.
-handleMessage conn@NatsConnection {..} msg@Info {..} =
+handleMessage conn@Connection {..} msg@Info {..} =
     enqueueMessage conn $ mkConnectMessage settings msg
 
 -- | Handle an Err message. If the error is fatal a NatsException is thrown.
@@ -192,16 +198,16 @@ handleMessage _ (Err pe)
 handleMessage _conn _msg = putStrLn "Got something else."
 
 -- | Deliver a message to a subscriber.
-deliverSubscription :: NatsMsg -> Subscription -> IO ()
-deliverSubscription msg (AsyncSubscription subscr) =
-    void $ forkIO (subscr msg)
+deliverSubscription :: NatsMsg -> Subscriber -> IO ()
+deliverSubscription msg (AsyncSubscriber action) =
+    void $ forkIO (action msg)
 
-deliverSubscription msg (SyncSubscription queue) =
+deliverSubscription msg (QueueSubscriber queue) =
     atomically $ writeTQueue queue msg
 
 -- | Given the settings and the Info record, produce a Connect record.
-mkConnectMessage :: NatsSettings -> Message -> Message
-mkConnectMessage NatsSettings {..} Info {..} =
+mkConnectMessage :: Settings -> Message -> Message
+mkConnectMessage Settings {..} Info {..} =
     Connect { clientVerbose     = Just verbose
             , clientPedantic    = Just pedantic
             , clientSslRequired = Just False

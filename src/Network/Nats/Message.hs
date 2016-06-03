@@ -8,8 +8,8 @@ import Network.Nats.Types ( Topic
                           , Payload
                           , QueueGroup
                           , ProtocolError
-                          , SubscriptionId
                           )
+import Network.Nats.Subscriber (SubscriptionId)
 
 -- | The kind of messages that can be exchanged between the NATS server
 -- and a NATS client.

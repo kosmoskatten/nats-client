@@ -13,7 +13,8 @@ import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
 
 import Network.Nats.Message (Message (..))
-import Network.Nats.Types (ProtocolError (..), SubscriptionId (..))
+import Network.Nats.Types (ProtocolError (..))
+import Network.Nats.Subscriber (SubscriptionId (..))
 
 data HandshakeMessageValue =
     Bool   !Bool
