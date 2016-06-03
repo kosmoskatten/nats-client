@@ -15,6 +15,7 @@ module Network.Nats
     , subscribeSync
     , nextMsg
     , publish
+    , publishJSON
     , runNatsClient
 
     -- For debugging purposes the parser/writer is exported.
@@ -37,6 +38,7 @@ import Control.Concurrent.STM ( atomically
 import Control.Exception (bracket, throw)
 import Control.Monad (forever, void)
 import Control.Monad.IO.Class (liftIO)
+import Data.Aeson (ToJSON, encode)
 import Data.Conduit ( Conduit
                     , Sink
                     , Source
@@ -103,6 +105,9 @@ nextMsg (NatsQueue queue) = atomically $ readTQueue queue
 publish :: NatsConnection -> BS.ByteString -> LBS.ByteString -> IO ()
 publish conn topic payload =
     enqueueMessage conn $ Pub topic Nothing payload
+
+publishJSON :: ToJSON a => NatsConnection -> BS.ByteString -> a -> IO ()
+publishJSON conn topic = publish conn topic . encode
 
 -- | Run the Nats client given the settings and connection URI. Once
 -- the NatsApp has terminated its execution the connection is closed.
