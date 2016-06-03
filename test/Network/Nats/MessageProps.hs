@@ -63,7 +63,7 @@ arbitraryConnect =
 -- | Arbitrary generation of Msg messages.
 arbitraryMsg :: Gen Message
 arbitraryMsg = Msg <$> alnumString
-                   <*> (Sid <$> alnumString)
+                   <*> (Sid <$> posInt)
                    <*> perhaps alnumString
                    <*> payloadString
 
@@ -77,7 +77,7 @@ arbitraryPub = Pub <$> alnumString
 arbitrarySub :: Gen Message
 arbitrarySub = Sub <$> alnumString 
                    <*> perhaps alnumString 
-                   <*> (Sid <$> alnumString)
+                   <*> (Sid <$> posInt)
 
 -- | Arbitrary generation of Ok messages.
 arbitraryOk :: Gen Message

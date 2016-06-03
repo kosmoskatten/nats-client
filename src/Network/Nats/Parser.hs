@@ -93,7 +93,7 @@ msgMessageWithReply = do
     singleSpace
     subject <- takeTill isSpace
     singleSpace
-    sid <- Sid <$> takeTill isSpace
+    sid <- Sid <$> decimal
     singleSpace
     reply <- takeTill isSpace
     singleSpace
@@ -109,7 +109,7 @@ msgMessageWithoutReply = do
     singleSpace
     subject <- takeTill isSpace
     singleSpace
-    sid <- Sid <$> takeTill isSpace
+    sid <- Sid <$> decimal
     singleSpace
     len <- decimal
     newLine
@@ -161,7 +161,7 @@ subMessageWithQueue = do
     singleSpace
     queue <- takeTill isSpace
     singleSpace
-    sid <- Sid <$> takeTill (== '\r')
+    sid <- Sid <$> decimal
     newLine
     return $ Sub subject (Just queue) sid
     
@@ -171,7 +171,7 @@ subMessageWithoutQueue = do
     singleSpace
     subject <- takeTill isSpace
     singleSpace
-    sid <- Sid <$> takeTill (== '\r')
+    sid <- Sid <$> decimal
     newLine
     return $ Sub subject Nothing sid
 

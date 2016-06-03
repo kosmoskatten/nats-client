@@ -145,4 +145,4 @@ writePE InvalidSubject           = byteString "\'Invalid Subject\'"
 
 -- | Translate a SubscriptionId to a Builder.
 writeSid :: SubscriptionId -> Builder
-writeSid (Sid sid) = byteString sid
+writeSid (Sid sid) = intDec sid
