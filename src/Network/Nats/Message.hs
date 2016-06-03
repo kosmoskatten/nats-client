@@ -3,9 +3,13 @@ module Network.Nats.Message
     ) where
 
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as LBS
 
-import Network.Nats.Types (ProtocolError, SubscriptionId)
+import Network.Nats.Types ( Topic
+                          , Payload
+                          , QueueGroup
+                          , ProtocolError
+                          , SubscriptionId
+                          )
 
 -- | The kind of messages that can be exchanged between the NATS server
 -- and a NATS client.
@@ -70,8 +74,7 @@ data Message =
     -- for responses.
     -- #bytes: Implicit by the length of the payload.
     -- payload: The message payload data.
-  | Msg !BS.ByteString !SubscriptionId !(Maybe BS.ByteString) 
-        !LBS.ByteString
+  | Msg !Topic !SubscriptionId !(Maybe Topic) !Payload
 
     -- | The Pub message publishes the message payload to the given
     -- subject name. If a reply subject is supplied, it will be
@@ -82,7 +85,7 @@ data Message =
     -- send a response back to the publisher/requestor.
     -- #bytes: Implicit by the length of payload.
     -- payload: The message payload data.
-  | Pub !BS.ByteString !(Maybe BS.ByteString) !LBS.ByteString
+  | Pub !Topic !(Maybe Topic) !Payload
 
     -- | The Sub message initiates a subscription to a subject,
     -- optionally joining a distributed queue group.
@@ -90,7 +93,7 @@ data Message =
     -- (Optional) queue group: If specified, the subscriper will join 
     -- this queue group.
     -- sid: A unique alphanumeric SubscriptionId.
-  | Sub !BS.ByteString !(Maybe BS.ByteString) !SubscriptionId
+  | Sub !Topic !(Maybe QueueGroup) !SubscriptionId
 
     -- | When the verbose (clientVerbose) option is set to true, the
     -- server acknowledges each well-formed prototol message from the

@@ -1,6 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Network.Nats.Types
-    ( NatsApp 
+    ( Topic
+    , Payload
+    , QueueGroup
+    , NatsApp
     , NatsURI
     , NatsMsg
     , NatsSubscriber
@@ -20,15 +22,18 @@ module Network.Nats.Types
 
 import Control.Concurrent.STM (TQueue, TVar)
 import Control.Exception (Exception)
-import Control.Monad (replicateM)
 import Data.Conduit.Network (AppData)
 import Data.Map.Lazy (Map)
 import Data.Typeable (Typeable)
 import System.Random
 
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.ByteString.Lazy.Char8 as LBS
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as LBS
 import qualified Data.Map.Lazy as Map
+
+type Topic = BS.ByteString
+type Payload = LBS.ByteString
+type QueueGroup = BS.ByteString
 
 -- | Type alias. A NatsApp is an IO action taking a Nats connection
 -- and returning a type a.
@@ -38,13 +43,11 @@ type NatsApp a = (NatsConnection -> IO a)
 type NatsURI = BS.ByteString
 
 -- | NATS message as recived by a subscriber.
-type NatsMsg = ( BS.ByteString, SubscriptionId
-               , Maybe BS.ByteString, LBS.ByteString
-               )
+type NatsMsg = ( Topic, SubscriptionId, Maybe Topic, Payload)
 
 type NatsSubscriber = (NatsMsg -> IO ())
 
-data Subscription 
+data Subscription
   = AsyncSubscription !NatsSubscriber
   | SyncSubscription !(TQueue NatsMsg)
 

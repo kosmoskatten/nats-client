@@ -63,7 +63,9 @@ import qualified Data.Map.Lazy as Map
 
 import Network.Nats.Message (Message (..))
 import Network.Nats.Parser (parseMessage)
-import Network.Nats.Types ( NatsApp
+import Network.Nats.Types ( Topic 
+                          , Payload
+                          , NatsApp
                           , NatsURI
                           , NatsMsg
                           , NatsSubscriber
@@ -81,7 +83,7 @@ import Network.Nats.Types ( NatsApp
                           )
 import Network.Nats.Writer (writeMessage)
 
-subscribeAsync :: NatsConnection -> BS.ByteString -> NatsSubscriber
+subscribeAsync :: NatsConnection -> Topic -> NatsSubscriber
                -> IO SubscriptionId
 subscribeAsync conn@NatsConnection {..} topic subscriber = do
     sid <- newSubscriptionId
@@ -90,7 +92,7 @@ subscribeAsync conn@NatsConnection {..} topic subscriber = do
     enqueueMessage conn $ Sub topic Nothing sid
     return sid
 
-subscribeSync :: NatsConnection -> BS.ByteString -> IO NatsQueue
+subscribeSync :: NatsConnection -> Topic -> IO NatsQueue
 subscribeSync conn@NatsConnection {..} topic = do
     sid   <- newSubscriptionId
     queue <- newTQueueIO
@@ -102,11 +104,11 @@ subscribeSync conn@NatsConnection {..} topic = do
 nextMsg :: NatsQueue -> IO NatsMsg
 nextMsg (NatsQueue queue) = atomically $ readTQueue queue
 
-publish :: NatsConnection -> BS.ByteString -> LBS.ByteString -> IO ()
+publish :: NatsConnection -> Topic -> Payload -> IO ()
 publish conn topic payload =
     enqueueMessage conn $ Pub topic Nothing payload
 
-publishJSON :: ToJSON a => NatsConnection -> BS.ByteString -> a -> IO ()
+publishJSON :: ToJSON a => NatsConnection -> Topic -> a -> IO ()
 publishJSON conn topic = publish conn topic . encode
 
 -- | Run the Nats client given the settings and connection URI. Once
