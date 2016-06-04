@@ -116,6 +116,15 @@ writeMessage' (Sub subject (Just queue) sid) =
                       <> byteString queue <> charUtf8 ' '
                       <> writeSid sid <> byteString "\r\n"
 
+-- Unsub message without auto-unsubscribe limit.
+writeMessage' (Unsub sid Nothing) =
+    byteString "UNSUB " <> writeSid sid <> byteString "\r\n"
+
+-- Unsub message with auto-unsubscribe limit.
+writeMessage' (Unsub sid (Just maxMsgs)) =
+    byteString "UNSUB " <> writeSid sid <> charUtf8 ' '
+                        <> intDec maxMsgs <> byteString "\r\n"
+
 -- Server acknowledge of a well-formed message.
 writeMessage' Ok = byteString "+OK\r\n"
 

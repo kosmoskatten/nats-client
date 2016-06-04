@@ -95,6 +95,11 @@ data Message =
     -- sid: A unique alphanumeric SubscriptionId.
   | Sub !Topic !(Maybe QueueGroup) !SubscriptionId
 
+    -- | The Unsub message unsubscribes the connection from the specified
+    -- subject, or auto-unsubscribes after the specified number of 
+    -- messages has been received.
+  | Unsub !SubscriptionId !(Maybe Int)
+
     -- | When the verbose (clientVerbose) option is set to true, the
     -- server acknowledges each well-formed prototol message from the
     -- client with a +OK message.

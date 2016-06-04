@@ -29,6 +29,7 @@ instance Arbitrary Message where
                       , arbitraryMsg
                       , arbitraryPub
                       , arbitrarySub
+                      , arbitraryUnsub
                       , arbitraryOk
                       , arbitraryErr
                       ]
@@ -78,6 +79,11 @@ arbitrarySub :: Gen Message
 arbitrarySub = Sub <$> alnumString 
                    <*> perhaps alnumString 
                    <*> (Sid <$> posInt)
+
+-- | Arbitrary generation of Sub messages.
+arbitraryUnsub :: Gen Message
+arbitraryUnsub = Unsub <$> (Sid <$> posInt)
+                       <*> perhaps posInt
 
 -- | Arbitrary generation of Ok messages.
 arbitraryOk :: Gen Message

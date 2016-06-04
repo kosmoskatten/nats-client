@@ -30,6 +30,7 @@ parseMessage = msgMessage
            <|> connectMessage
            <|> pubMessage
            <|> subMessage
+           <|> unsubMessage
            <|> okMessage 
            <|> errMessage
 
@@ -176,6 +177,29 @@ subMessageWithoutQueue = do
     newLine
     return $ Sub subject Nothing sid
 
+unsubMessage :: Parser Message
+unsubMessage = do
+    skipSpace
+    unsubMessageWithoutAutoUnsubscribe <|> unsubMessageWithAutoUnsubscribe
+
+unsubMessageWithoutAutoUnsubscribe :: Parser Message
+unsubMessageWithoutAutoUnsubscribe = do
+    msgName "UNSUB"
+    singleSpace
+    sid <- parseSid
+    newLine
+    return $ Unsub sid Nothing
+
+unsubMessageWithAutoUnsubscribe :: Parser Message
+unsubMessageWithAutoUnsubscribe = do
+    msgName "UNSUB"
+    singleSpace
+    sid <- parseSid
+    singleSpace
+    maxMsgs <- decimal
+    newLine
+    return $ Unsub sid (Just maxMsgs)
+
 okMessage :: Parser Message
 okMessage = do
     skipSpace
@@ -285,6 +309,9 @@ protocolError =
 
     stringCI "\'Invalid Subject\'"
         *> return InvalidSubject
+
+parseSid :: Parser SubscriptionId
+parseSid = Sid <$> decimal
 
 mkInfoMessage :: [HandshakeMessageField] -> Parser Message
 mkInfoMessage fields =
