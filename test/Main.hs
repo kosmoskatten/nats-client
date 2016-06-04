@@ -12,6 +12,7 @@ import Network.NatsTests ( asyncSubscribeSingleMsg
                          , syncSubscribeSingleJsonMsg
                          , syncSubscribeSeveralMsgWithTmo
                          , syncSubscribeSeveralJsonMsgWithTmo
+                         , unsubscribe
                          )
 import Network.Nats.MessageProps (encodeDecodeMessage)
 
@@ -37,5 +38,7 @@ testSuite =
                    syncSubscribeSeveralMsgWithTmo
         , testCase "Successfully subscribe and receive several JSON msg"
                    syncSubscribeSeveralJsonMsgWithTmo
+        , testCase "Successfully unsubscribe from a topic"
+                   unsubscribe
         ]
     ]

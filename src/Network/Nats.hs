@@ -16,6 +16,7 @@ module Network.Nats
     , subAsyncJson'
     , subQueue
     , subQueue'
+    , unsub
     , nextMsg
     , nextJsonMsg
     , pub
@@ -87,6 +88,7 @@ import Network.Nats.Subscriber ( NatsMsg (..)
                                , SubscriptionId (..)
                                , empty
                                , addSubscriber
+                               , deleteSubscriber
                                , lookupSubscriber
                                , newSubscriptionId
                                )
@@ -128,19 +130,27 @@ subAsyncJson' :: FromJSON a => Connection -> Topic
 subAsyncJson' conn topic = subAsyncJson conn topic Nothing
 
 -- | Subscribe to a Topic where the messages are put to a MsgQueue.
-subQueue :: Connection -> Topic -> Maybe QueueGroup -> IO MsgQueue
+subQueue :: Connection -> Topic -> Maybe QueueGroup
+         -> IO (SubscriptionId, MsgQueue)
 subQueue conn@Connection {..} topic queueGroup = do
     sid   <- newSubscriptionId
     queue <- newTQueueIO
     atomically (modifyTVar subscribers $
         addSubscriber sid (QueueSubscriber queue))
     enqueueMessage conn $ Sub topic queueGroup sid
-    return $ MsgQueue queue
+    return $ (sid, MsgQueue queue)
 
 -- | Subscribe to a Topic where the messages are put to a MsgQueue.
 -- Shortcut wihtout QueueGroup.
-subQueue' :: Connection -> Topic -> IO MsgQueue
+subQueue' :: Connection -> Topic -> IO (SubscriptionId, MsgQueue)
 subQueue' conn topic = subQueue conn topic Nothing
+
+-- | Unsubscribe from a Topic using the SubscriptionId from when
+-- subscribing.
+unsub :: Connection -> SubscriptionId -> IO ()
+unsub conn@Connection {..} sid = do
+    enqueueMessage conn $ Unsub sid Nothing
+    atomically (modifyTVar subscribers $ deleteSubscriber sid) 
 
 -- | Read the next message from the MsgQueue. The call is blocking
 -- until a message arrives or interrupted by System.Timeout.timeout.

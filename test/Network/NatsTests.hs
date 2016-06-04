@@ -7,6 +7,7 @@ module Network.NatsTests
     , syncSubscribeSingleJsonMsg
     , syncSubscribeSeveralMsgWithTmo
     , syncSubscribeSeveralJsonMsgWithTmo
+    , unsubscribe
     ) where
 
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
@@ -60,26 +61,28 @@ asyncSubscribeSingleJsonMsg =
 syncSubscribeSingleMsg :: Assertion
 syncSubscribeSingleMsg =
     void $ runNatsClient settings "" $ \conn -> do
-        queue <- subQueue' conn "foo"
+        (sid, queue) <- subQueue' conn "foo"
         pub' conn "foo" "Hello sync world!"
 
-        NatsMsg _ _ _ payload <- nextMsg queue
+        NatsMsg _ sid' _ payload <- nextMsg queue
+        assertEqual "Shall be equal" sid sid'
         assertEqual "Shall be equal" "Hello sync world!" payload
 
 syncSubscribeSingleJsonMsg :: Assertion
 syncSubscribeSingleJsonMsg =
     void $ runNatsClient settings "" $ \conn -> do
-        queue <- subQueue' conn "foo"
+        (sid, queue) <- subQueue' conn "foo"
         let msg = TestMsg { stringField = "foo", intField = 234 }
         pubJson' conn "foo" msg
 
-        JsonMsg _ _ _ payload <- nextJsonMsg queue
+        JsonMsg _ sid' _ payload <- nextJsonMsg queue
+        assertEqual "Shall be equal" sid sid'
         assertEqual "Shall be equal" (Just msg) payload
 
 syncSubscribeSeveralMsgWithTmo :: Assertion
 syncSubscribeSeveralMsgWithTmo =
     void $ runNatsClient settings "" $ \conn -> do
-        queue <- subQueue' conn "foo"
+        (_, queue) <- subQueue' conn "foo"
         pub' conn "foo" "one"
         pub' conn "foo" "two"
         pub' conn "foo" "three"
@@ -98,7 +101,7 @@ syncSubscribeSeveralMsgWithTmo =
 syncSubscribeSeveralJsonMsgWithTmo :: Assertion
 syncSubscribeSeveralJsonMsgWithTmo =
     void $ runNatsClient settings "" $ \conn -> do
-        queue <- subQueue' conn "foo"
+        (_, queue) <- subQueue' conn "foo"
         let msg1 = TestMsg { stringField = "foo", intField = 345 }
             msg2 = TestMsg { stringField = "foo", intField = 456 }
             msg3 = TestMsg { stringField = "foo", intField = 567 }
@@ -116,7 +119,23 @@ syncSubscribeSeveralJsonMsgWithTmo =
         assertEqual "Shall be equal" (Just msg3) payload3
 
         result <- timeout 100000 $ nextJsonMsg queue
-        assertEqual "Shall be equal" Nothing (result :: Maybe (JsonMsg TestMsg))
+        assertEqual "Shall be equal" Nothing
+                    (result :: Maybe (JsonMsg TestMsg))
+
+unsubscribe :: Assertion
+unsubscribe =
+    void $ runNatsClient settings "" $ \conn -> do
+        (sid, queue) <- subQueue' conn "foo"
+
+        pub' conn "foo" "one"
+        Just (NatsMsg _ _ _ payload) <- timeout 100000 $ nextMsg queue
+
+        unsub conn sid
+        pub' conn "foo" "two"
+        result <- timeout 10000 $ nextMsg queue
+
+        assertEqual "Shall be equal" "one" payload
+        assertEqual "Shall be equal" Nothing result
 
 settings :: Settings
 settings = defaultSettings { verbose  = True
