@@ -5,13 +5,16 @@ module Network.Nats
     ( Connection
     , Settings (..)
     , NatsMsg (..)
+    , JsonMsg (..)
     , NatsException (..)
     , NatsURI
     , SubscriptionId (..)
     , defaultSettings
     , subAsync
+    , subAsyncJson
     , subQueue
     , nextMsg
+    , nextJsonMsg
     , pub
     , pubJson
     , runNatsClient
@@ -36,7 +39,7 @@ import Control.Concurrent.STM ( atomically
 import Control.Exception (bracket, throw)
 import Control.Monad (forever, void)
 import Control.Monad.IO.Class (liftIO)
-import Data.Aeson (ToJSON, encode)
+import Data.Aeson (FromJSON, ToJSON, decode', encode)
 import Data.Conduit ( Conduit
                     , Sink
                     , Source
@@ -72,6 +75,7 @@ import Network.Nats.Types ( Topic
                           , isFatalError
                           )
 import Network.Nats.Subscriber ( NatsMsg (..)
+                               , JsonMsg (..)
                                , MsgQueue (..)
                                , Subscriber (..)
                                , SubscriptionId (..)
@@ -93,6 +97,15 @@ subAsync conn@Connection {..} topic action = do
     enqueueMessage conn $ Sub topic Nothing sid
     return sid
 
+-- | Subscribe on a Topic with an asyncronous action to handle
+-- JSON messages sent to this Topic. The asyncronous action will be
+-- executed in a new thread.
+subAsyncJson :: FromJSON a => Connection -> Topic -> (JsonMsg a -> IO ())
+             -> IO SubscriptionId
+subAsyncJson conn topic action =
+    subAsync conn topic $ \(NatsMsg topic' sid reply payload) ->
+        action $ JsonMsg topic' sid reply (decode' payload)
+
 -- | Subscribe to a Topic where the messages are put to a MsgQueue.
 subQueue :: Connection -> Topic -> IO MsgQueue
 subQueue conn@Connection {..} topic = do
@@ -107,6 +120,13 @@ subQueue conn@Connection {..} topic = do
 -- until a message arrives or interrupted by System.Timeout.timeout.
 nextMsg :: MsgQueue -> IO NatsMsg
 nextMsg (MsgQueue queue) = atomically $ readTQueue queue
+
+-- | Read the next JSON message from the MsgQueue. The call is blocking
+-- until a message arrives or interrupted by System.Timeout.timeout.
+nextJsonMsg :: FromJSON a => MsgQueue -> IO (JsonMsg a)
+nextJsonMsg queue = do
+    NatsMsg topic sid reply payload <- nextMsg queue
+    return $ JsonMsg topic sid reply (decode' payload)
 
 -- | Publish a message to a Topic.
 pub :: Connection -> Topic -> Payload -> IO ()

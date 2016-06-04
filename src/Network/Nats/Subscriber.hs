@@ -39,7 +39,7 @@ data NatsMsg = NatsMsg !Topic !SubscriptionId !(Maybe Topic) !Payload
     deriving (Eq, Ord, Show)
 
 -- | A NATS message with the payload converted to JSON.
-data JsonMsg a = JsonMsg !Topic !SubscriptionId !(Maybe Topic) !a
+data JsonMsg a = JsonMsg !Topic !SubscriptionId !(Maybe Topic) !(Maybe a)
     deriving (Eq, Ord, Show)
 
 -- | A concurrent queue of pending messages.

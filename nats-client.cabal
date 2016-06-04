@@ -44,6 +44,7 @@ test-suite nats-tests
                       Network.Nats.MessageProps
   type:               exitcode-stdio-1.0
   build-depends:      base >= 4.8 && <4.9
+                    , aeson
                     , attoparsec
                     , bytestring
                     , HUnit

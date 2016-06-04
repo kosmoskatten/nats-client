@@ -7,8 +7,11 @@ import Test.Framework.Providers.HUnit (testCase)
 import Test.Framework.Providers.QuickCheck2 (testProperty)
 
 import Network.NatsTests ( asyncSubscribeSingleMsg
+                         , asyncSubscribeSingleJsonMsg
                          , syncSubscribeSingleMsg
+                         , syncSubscribeSingleJsonMsg
                          , syncSubscribeSeveralMsgWithTmo
+                         , syncSubscribeSeveralJsonMsgWithTmo
                          )
 import Network.Nats.MessageProps (encodeDecodeMessage)
 
@@ -22,11 +25,17 @@ testSuite =
                        encodeDecodeMessage
         ]
     , testGroup "Client tests (using real server)"
-        [ testCase "Successfully subscribe and receive one async msgs"
+        [ testCase "Successfully subscribe and receive one async msg"
                    asyncSubscribeSingleMsg
-        , testCase "Successfully subscribe and receive one sync msgs"
+        , testCase "Successfully subscribe and receive one async JSON msg"
+                   asyncSubscribeSingleJsonMsg
+        , testCase "Successfully subscribe and receive one sync msg"
                    syncSubscribeSingleMsg
-        , testCase "Successfully subscribe and receive several sync msgs"
+        , testCase "Successfully subscribe and receive one sync JSON msg"
+                   syncSubscribeSingleJsonMsg
+        , testCase "Successfully subscribe and receive several sync msg"
                    syncSubscribeSeveralMsgWithTmo
+        , testCase "Successfully subscribe and receive several JSON msg"
+                   syncSubscribeSeveralJsonMsgWithTmo
         ]
     ]
