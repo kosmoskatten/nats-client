@@ -11,12 +11,17 @@ module Network.Nats
     , SubscriptionId (..)
     , defaultSettings
     , subAsync
+    , subAsync'
     , subAsyncJson
+    , subAsyncJson'
     , subQueue
+    , subQueue'
     , nextMsg
     , nextJsonMsg
     , pub
+    , pub'
     , pubJson
+    , pubJson'
     , runNatsClient
 
     -- For debugging purposes the parser/writer is exported.
@@ -69,6 +74,7 @@ import Network.Nats.Message (Message (..))
 import Network.Nats.Parser (parseMessage)
 import Network.Nats.Types ( Topic 
                           , Payload
+                          , QueueGroup
                           , NatsURI
                           , NatsException (..)
                           , ProtocolError (..)
@@ -89,32 +95,52 @@ import Network.Nats.Writer (writeMessage)
 -- | Subscribe on a Topic with an asyncronous action to handle
 -- messages sent to this Topic. The asyncronous action will be
 -- executed in a new thread.
-subAsync :: Connection -> Topic -> (NatsMsg -> IO ()) -> IO SubscriptionId
-subAsync conn@Connection {..} topic action = do
+subAsync :: Connection -> Topic -> Maybe QueueGroup 
+         -> (NatsMsg -> IO ()) -> IO SubscriptionId
+subAsync conn@Connection {..} topic queueGroup action = do
     sid <- newSubscriptionId
     atomically (modifyTVar subscribers $ 
         addSubscriber sid (AsyncSubscriber action))
-    enqueueMessage conn $ Sub topic Nothing sid
+    enqueueMessage conn $ Sub topic queueGroup sid
     return sid
+
+-- | Subscribe on a Topic with an asyncronous action to handle
+-- messages sent to this Topic. The asyncronous action will be
+-- executed in a new thread. Shortcut without QueueGroup.
+subAsync' :: Connection -> Topic -> (NatsMsg -> IO ())
+          -> IO SubscriptionId
+subAsync' conn topic = subAsync conn topic Nothing
 
 -- | Subscribe on a Topic with an asyncronous action to handle
 -- JSON messages sent to this Topic. The asyncronous action will be
 -- executed in a new thread.
-subAsyncJson :: FromJSON a => Connection -> Topic -> (JsonMsg a -> IO ())
-             -> IO SubscriptionId
-subAsyncJson conn topic action =
-    subAsync conn topic $ \(NatsMsg topic' sid reply payload) ->
+subAsyncJson :: FromJSON a => Connection -> Topic -> Maybe QueueGroup
+             -> (JsonMsg a -> IO ()) -> IO SubscriptionId
+subAsyncJson conn topic queueGroup action =
+    subAsync conn topic queueGroup $ \(NatsMsg topic' sid reply payload) ->
         action $ JsonMsg topic' sid reply (decode' payload)
 
+-- | Subscribe on a Topic with an asyncronous action to handle
+-- JSON messages sent to this Topic. The asyncronous action will be
+-- executed in a new thread. Shortcut without QueueGroup.
+subAsyncJson' :: FromJSON a => Connection -> Topic
+              -> (JsonMsg a -> IO ()) -> IO SubscriptionId
+subAsyncJson' conn topic = subAsyncJson conn topic Nothing
+
 -- | Subscribe to a Topic where the messages are put to a MsgQueue.
-subQueue :: Connection -> Topic -> IO MsgQueue
-subQueue conn@Connection {..} topic = do
+subQueue :: Connection -> Topic -> Maybe QueueGroup -> IO MsgQueue
+subQueue conn@Connection {..} topic queueGroup = do
     sid   <- newSubscriptionId
     queue <- newTQueueIO
     atomically (modifyTVar subscribers $
         addSubscriber sid (QueueSubscriber queue))
-    enqueueMessage conn $ Sub topic Nothing sid
+    enqueueMessage conn $ Sub topic queueGroup sid
     return $ MsgQueue queue
+
+-- | Subscribe to a Topic where the messages are put to a MsgQueue.
+-- Shortcut wihtout QueueGroup.
+subQueue' :: Connection -> Topic -> IO MsgQueue
+subQueue' conn topic = subQueue conn topic Nothing
 
 -- | Read the next message from the MsgQueue. The call is blocking
 -- until a message arrives or interrupted by System.Timeout.timeout.
@@ -129,12 +155,21 @@ nextJsonMsg queue = do
     return $ JsonMsg topic sid reply (decode' payload)
 
 -- | Publish a message to a Topic.
-pub :: Connection -> Topic -> Payload -> IO ()
-pub conn topic payload = enqueueMessage conn $ Pub topic Nothing payload
+pub :: Connection -> Topic -> Maybe Topic -> Payload -> IO ()
+pub conn topic reply payload = 
+    enqueueMessage conn $ Pub topic reply payload
+
+-- | Publish a message to a Topic. Shortcut with no reply-to Topic.
+pub' :: Connection -> Topic -> Payload -> IO ()
+pub' conn topic = pub conn topic Nothing
 
 -- | Publish a JSON message to a Topic.
-pubJson :: ToJSON a => Connection -> Topic -> a -> IO ()
-pubJson conn topic = pub conn topic . encode
+pubJson :: ToJSON a => Connection -> Topic -> Maybe Topic -> a -> IO ()
+pubJson conn topic reply = pub conn topic reply . encode
+
+-- | Publish a JSON message to a Topic. Shortcut with no reply-to Topic.
+pubJson' :: ToJSON a => Connection -> Topic -> a -> IO ()
+pubJson' conn topic = pubJson conn topic Nothing
 
 -- | Run the Nats client given the settings and connection URI. Once
 -- the NatsApp has terminated its execution the connection is closed.

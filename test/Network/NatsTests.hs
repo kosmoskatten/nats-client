@@ -31,8 +31,8 @@ asyncSubscribeSingleMsg :: Assertion
 asyncSubscribeSingleMsg =
     void $ runNatsClient settings "" $ \conn -> do
         sync <- newEmptyMVar
-        sid <- subAsync conn "foo" $ handler sync
-        pub conn "foo" "Hello World!"
+        sid <- subAsync' conn "foo" $ handler sync
+        pub' conn "foo" "Hello World!"
 
         (sid', value) <- takeMVar sync
         assertEqual "Shall be equal" sid sid'
@@ -45,9 +45,9 @@ asyncSubscribeSingleJsonMsg :: Assertion
 asyncSubscribeSingleJsonMsg =
     void $ runNatsClient settings "" $ \conn -> do
         sync <- newEmptyMVar
-        sid <- subAsyncJson conn "foo" $ handler sync
+        sid <- subAsyncJson' conn "foo" $ handler sync
         let msg = TestMsg { stringField = "foo", intField = 123 }
-        pubJson conn "foo" msg
+        pubJson' conn "foo" msg
 
         (sid', value) <- takeMVar sync
         assertEqual "Shall be equal" sid sid'
@@ -60,8 +60,8 @@ asyncSubscribeSingleJsonMsg =
 syncSubscribeSingleMsg :: Assertion
 syncSubscribeSingleMsg =
     void $ runNatsClient settings "" $ \conn -> do
-        queue <- subQueue conn "foo"
-        pub conn "foo" "Hello sync world!"
+        queue <- subQueue' conn "foo"
+        pub' conn "foo" "Hello sync world!"
 
         NatsMsg _ _ _ payload <- nextMsg queue
         assertEqual "Shall be equal" "Hello sync world!" payload
@@ -69,9 +69,9 @@ syncSubscribeSingleMsg =
 syncSubscribeSingleJsonMsg :: Assertion
 syncSubscribeSingleJsonMsg =
     void $ runNatsClient settings "" $ \conn -> do
-        queue <- subQueue conn "foo"
+        queue <- subQueue' conn "foo"
         let msg = TestMsg { stringField = "foo", intField = 234 }
-        pubJson conn "foo" msg
+        pubJson' conn "foo" msg
 
         JsonMsg _ _ _ payload <- nextJsonMsg queue
         assertEqual "Shall be equal" (Just msg) payload
@@ -79,10 +79,10 @@ syncSubscribeSingleJsonMsg =
 syncSubscribeSeveralMsgWithTmo :: Assertion
 syncSubscribeSeveralMsgWithTmo =
     void $ runNatsClient settings "" $ \conn -> do
-        queue <- subQueue conn "foo"
-        pub conn "foo" "one"
-        pub conn "foo" "two"
-        pub conn "foo" "three"
+        queue <- subQueue' conn "foo"
+        pub' conn "foo" "one"
+        pub' conn "foo" "two"
+        pub' conn "foo" "three"
 
         Just (NatsMsg _ _ _ payload1) <- timeout 100000 $ nextMsg queue
         Just (NatsMsg _ _ _ payload2) <- timeout 100000 $ nextMsg queue
@@ -98,14 +98,14 @@ syncSubscribeSeveralMsgWithTmo =
 syncSubscribeSeveralJsonMsgWithTmo :: Assertion
 syncSubscribeSeveralJsonMsgWithTmo =
     void $ runNatsClient settings "" $ \conn -> do
-        queue <- subQueue conn "foo"
+        queue <- subQueue' conn "foo"
         let msg1 = TestMsg { stringField = "foo", intField = 345 }
             msg2 = TestMsg { stringField = "foo", intField = 456 }
             msg3 = TestMsg { stringField = "foo", intField = 567 }
 
-        pubJson conn "foo" msg1
-        pubJson conn "foo" msg2
-        pubJson conn "foo" msg3
+        pubJson' conn "foo" msg1
+        pubJson' conn "foo" msg2
+        pubJson' conn "foo" msg3
 
         Just (JsonMsg _ _ _ payload1) <- timeout 100000 $ nextJsonMsg queue
         Just (JsonMsg _ _ _ payload2) <- timeout 100000 $ nextJsonMsg queue
