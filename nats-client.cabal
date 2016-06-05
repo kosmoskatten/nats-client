@@ -53,6 +53,6 @@ test-suite nats-tests
                     , test-framework-hunit
                     , test-framework-quickcheck2
                     , QuickCheck
-  hs-source-dirs:     test
+  hs-source-dirs:     tests
   default-language:   Haskell2010
   ghc-options:        -Wall
