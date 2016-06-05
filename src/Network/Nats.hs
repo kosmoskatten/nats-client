@@ -49,8 +49,7 @@ import Control.Exception (bracket, throw)
 import Control.Monad (forever, void)
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (FromJSON, ToJSON, decode', encode)
-import Data.Conduit ( Conduit
-                    , Sink
+import Data.Conduit ( Sink
                     , Source
                     , (=$=), ($$)
                     , awaitForever
@@ -223,7 +222,7 @@ enqueueMessage Connection {..} msg = do
 transmissionPipeline :: Connection -> IO ()
 transmissionPipeline Connection {..} = do
     let netSink = appSink appData
-    stmSource =$= streamLogger $$ netSink
+    stmSource $$ netSink
     where
       stmSource :: Source IO BS.ByteString
       stmSource = 
@@ -235,8 +234,7 @@ transmissionPipeline Connection {..} = do
 receptionPipeline :: Connection -> IO ()
 receptionPipeline conn = do
     let netSource = appSource $ appData conn
-    netSource =$= streamLogger =$= conduitParserEither parseMessage 
-        $$ messageSink
+    netSource =$= conduitParserEither parseMessage $$ messageSink
     where
       messageSink :: Sink (Either ParseError (PositionRange, Message)) IO ()
       messageSink = awaitForever $ \eMsg ->
@@ -267,7 +265,7 @@ handleMessage _ (Err pe)
     | isFatalError pe = throw (NatsException pe)
     | otherwise       = return ()
 
-handleMessage _conn _msg = putStrLn "Got something else."
+handleMessage _conn _msg = return ()
 
 -- | Deliver a message to a subscriber.
 deliverSubscription :: NatsMsg -> Subscriber -> IO ()
@@ -292,9 +290,10 @@ mkConnectMessage Settings {..} Info {..} =
             }
 mkConnectMessage _ _ = error "Must be an Info record."
 
-streamLogger :: Conduit BS.ByteString IO BS.ByteString
+{-streamLogger :: Conduit BS.ByteString IO BS.ByteString
 streamLogger = 
     awaitForever $ \str -> do
         liftIO $ BS.putStrLn str
         yield str
+-}
 

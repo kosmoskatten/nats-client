@@ -3,12 +3,22 @@ module Main
     ( main
     ) where
 
+import Control.Monad (replicateM_, void)
+import Control.Concurrent.STM ( STM
+                              , TVar
+                              , atomically
+                              , modifyTVar
+                              , newTVarIO
+                              , readTVar
+                              , retry
+                              )
 import Criterion.Main ( Benchmark
                       , defaultMain
                       , bgroup
                       , bench
                       , env
                       , nf
+                      , whnfIO
                       )
 import Data.Attoparsec.ByteString.Char8 ( IResult (..)
                                         , Result
@@ -28,25 +38,29 @@ main = defaultMain suite
 
 suite :: [Benchmark]
 suite =
-    [ bgroup "Pub message writer benchmarks"
+    [ bgroup "pub-writer"
         [ env smallPubMessages $ \xs ->
-            bench "Small (48 bytes) Pub msgs" $ nf writePubs xs
+            bench "million * 48 bytes" $ nf writePubs xs
 
         , env mediumPubMessages $ \xs ->
-            bench "Medium (480 bytes) Pub msgs" $ nf writePubs xs
+            bench "million * 480 bytes" $ nf writePubs xs
 
         , env largePubMessages $ \xs ->
-            bench "Large (4800 bytes) Pub msgs" $ nf writePubs xs
+            bench "million * 4800 bytes" $ nf writePubs xs
         ]
-    , bgroup "Msg message parser benchmarks"
+    , bgroup "msg-parser"
         [ env smallMsgMessages $ \xs ->
-            bench "Small (48 bytes) Msg msgs" $ nf parseMsgs xs
+            bench "million * 48 bytes" $ nf parseMsgs xs
 
         , env mediumMsgMessages $ \xs ->
-            bench "Medium (480 bytes) Msg msgs" $ nf parseMsgs xs
+            bench "million * 480 bytes" $ nf parseMsgs xs
 
         , env largeMsgMessages $ \xs ->
-            bench "Large (4800 bytes) Msg msgs" $ nf parseMsgs xs
+            bench "million * 4800 bytes" $ nf parseMsgs xs
+        ]
+    , bgroup "pubsub-nats"
+        [ bench "100000 pub" $ whnfIO (pubPerf 100000)
+        , bench "10000 pubsub" $ whnfIO (pubSubPerf 10000)
         ]
     ]
 
@@ -62,6 +76,35 @@ parseMsgs = map (fromResult . parse parseMessage)
       fromResult (Done _ msg)   = msg
       fromResult (Partial cont) = fromResult (cont "")
       fromResult _              = error "Shall not happen"
+
+-- | Send the given number of Pub messages containing the payload "hello".
+-- The benchmark requires a running NATS server.
+pubPerf :: Int -> IO ()
+pubPerf rep =
+    runNatsClient defaultSettings "" $ \conn ->
+        replicateM_ rep $ pub' conn "bench" "hello"
+
+-- | Send the given number of Pub messages containing the payload "hello"
+-- Subscribe to and receive the same number of messages.
+-- The benchmark requires a running NATS server.
+pubSubPerf :: Int -> IO ()
+pubSubPerf rep =
+    runNatsClient defaultSettings "" $ \conn -> do
+        tvar <- newTVarIO 0
+        void $ subAsync' conn "bench" $ receiver tvar
+        replicateM_ rep $ pub' conn "bench" "hello"
+
+        atomically $ waitForValue tvar rep
+
+receiver :: TVar Int -> NatsMsg -> IO ()
+receiver tvar _ = atomically $ modifyTVar tvar (+ 1)
+
+waitForValue :: TVar Int -> Int -> STM ()
+waitForValue tvar value = do
+    value' <- readTVar tvar
+    if value' /= value
+        then retry
+        else return ()
 
 million :: Int
 million = 1000000
