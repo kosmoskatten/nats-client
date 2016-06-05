@@ -1,7 +1,11 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric  #-}
 module Network.Nats.Message
     ( Message (..)
     ) where
 
+import Control.DeepSeq (NFData)
+import GHC.Generics (Generic)
 import qualified Data.ByteString as BS
 
 import Network.Nats.Types ( Topic
@@ -117,4 +121,4 @@ data Message =
     -- Most of those errors result in the server closing the
     -- connection. InvalidSubject is the exception.
   | Err !ProtocolError
-    deriving (Eq, Show)
+    deriving (Eq, Generic, NFData, Show)

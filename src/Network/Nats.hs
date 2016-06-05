@@ -8,6 +8,9 @@ module Network.Nats
     , JsonMsg (..)
     , NatsException (..)
     , NatsURI
+    , Topic
+    , Payload
+    , QueueGroup
     , SubscriptionId (..)
     , defaultSettings
     , subAsync

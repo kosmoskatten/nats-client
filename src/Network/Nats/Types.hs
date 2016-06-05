@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric  #-}
 module Network.Nats.Types
     ( Topic
     , Payload
@@ -8,8 +10,10 @@ module Network.Nats.Types
     , isFatalError
     ) where
 
+import Control.DeepSeq (NFData)
 import Control.Exception (Exception)
 import Data.Typeable (Typeable)
+import GHC.Generics (Generic)
 
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
@@ -37,7 +41,7 @@ data ProtocolError =
   | SlowConsumer
   | MaximumPayloadExceeded
   | InvalidSubject
-    deriving (Bounded, Enum, Eq, Show)
+    deriving (Bounded, Enum, Eq, Generic, NFData, Show)
 
 -- | Tell if a protocol error is fatal or not. Fatal is an error that
 -- will make the server close the connection. All protocol errors but
