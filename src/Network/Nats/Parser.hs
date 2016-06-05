@@ -31,6 +31,8 @@ parseMessage = msgMessage
            <|> pubMessage
            <|> subMessage
            <|> unsubMessage
+           <|> pingMessage
+           <|> pongMessage
            <|> okMessage 
            <|> errMessage
 
@@ -199,6 +201,16 @@ unsubMessageWithAutoUnsubscribe = do
     maxMsgs <- decimal
     newLine
     return $ Unsub sid (Just maxMsgs)
+
+pingMessage :: Parser Message
+pingMessage = do
+    skipSpace
+    (msgName "PING" >> newLine) *> return Ping
+
+pongMessage :: Parser Message
+pongMessage = do
+    skipSpace
+    (msgName "PONG" >> newLine) *> return Pong
 
 okMessage :: Parser Message
 okMessage = do

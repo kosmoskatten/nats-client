@@ -100,6 +100,13 @@ data Message =
     -- messages has been received.
   | Unsub !SubscriptionId !(Maybe Int)
 
+    -- | The Ping and Pong messages are the keep-alive mechanism between
+    -- the client and the server. The server will continously send
+    -- Ping messages to the client. If the client does not reply
+    -- within time the connection is terminated by the server.
+  | Ping
+  | Pong
+
     -- | When the verbose (clientVerbose) option is set to true, the
     -- server acknowledges each well-formed prototol message from the
     -- client with a +OK message.

@@ -30,6 +30,7 @@ instance Arbitrary Message where
                       , arbitraryPub
                       , arbitrarySub
                       , arbitraryUnsub
+                      , arbitraryPingPong
                       , arbitraryOk
                       , arbitraryErr
                       ]
@@ -84,6 +85,10 @@ arbitrarySub = Sub <$> alnumString
 arbitraryUnsub :: Gen Message
 arbitraryUnsub = Unsub <$> (Sid <$> posInt)
                        <*> perhaps posInt
+
+-- | Arbitrary generation of Ping/Pong messages.
+arbitraryPingPong :: Gen Message
+arbitraryPingPong = oneof [ pure Ping, pure Pong ]
 
 -- | Arbitrary generation of Ok messages.
 arbitraryOk :: Gen Message

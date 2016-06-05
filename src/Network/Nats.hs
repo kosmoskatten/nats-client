@@ -244,7 +244,8 @@ receptionPipeline conn = do
 -- | Handle the semantic actions for one received message.
 handleMessage :: Connection -> Message -> IO ()
 
--- | Handle a Msg message. Dispatch the message to the subscriber.
+-- | Handle a Msg message. Dispatch the message to the subscriber. If
+-- there'e no subscriber the message is dropped.
 handleMessage Connection {..} (Msg topic sid reply payload) = do
     subscribers' <- readTVarIO subscribers
     maybe (return ()) 
@@ -254,6 +255,9 @@ handleMessage Connection {..} (Msg topic sid reply payload) = do
 -- | Handle an Info message. Just produce and enqueue a Connect message.
 handleMessage conn@Connection {..} msg@Info {..} =
     enqueueMessage conn $ mkConnectMessage settings msg
+
+-- | Handle a Ping message. Just reply with a Pong message.
+handleMessage conn Ping = enqueueMessage conn Pong
 
 -- | Handle an Err message. If the error is fatal a NatsException is thrown.
 handleMessage _ (Err pe)

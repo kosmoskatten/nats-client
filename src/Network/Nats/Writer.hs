@@ -125,6 +125,12 @@ writeMessage' (Unsub sid (Just maxMsgs)) =
     byteString "UNSUB " <> writeSid sid <> charUtf8 ' '
                         <> intDec maxMsgs <> byteString "\r\n"
 
+-- Ping message.
+writeMessage' Ping = byteString "PING" <> byteString "\r\n"
+
+-- Pong message.
+writeMessage' Pong = byteString "PONG" <> byteString "\r\n"
+
 -- Server acknowledge of a well-formed message.
 writeMessage' Ok = byteString "+OK\r\n"
 
