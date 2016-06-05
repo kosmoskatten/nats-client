@@ -63,6 +63,7 @@ benchmark nats-bench
   -- other-modules:
   type:              exitcode-stdio-1.0
   build-depends:     base >= 4.8 && <4.9
+                   , attoparsec
                    , bytestring
                    , criterion
                    , nats-client
