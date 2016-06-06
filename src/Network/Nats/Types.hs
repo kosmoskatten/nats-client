@@ -7,7 +7,9 @@ module Network.Nats.Types
     , NatsURI
     , NatsException (..)
     , ProtocolError (..)
+    , Timeout (..)
     , isFatalError
+    , toUSec
     ) where
 
 import Control.DeepSeq (NFData)
@@ -32,8 +34,8 @@ data NatsException = NatsException !ProtocolError
 instance Exception NatsException
 
 -- | Protocol error enumeration.
-data ProtocolError =
-    UnknownProtocolOperation
+data ProtocolError
+  = UnknownProtocolOperation
   | AuthorizationViolation
   | AuthorizationTimeout
   | ParserError
@@ -43,10 +45,26 @@ data ProtocolError =
   | InvalidSubject
     deriving (Bounded, Enum, Eq, Generic, NFData, Show)
 
+-- | A value to specify timeout duration.
+data Timeout
+    = Sec  !Int
+    | MSec !Int
+    | USec !Int
+    | Infinity
+    deriving Show
+
 -- | Tell if a protocol error is fatal or not. Fatal is an error that
 -- will make the server close the connection. All protocol errors but
 -- InvalidSubject are fatal.
 isFatalError :: ProtocolError -> Bool
 isFatalError InvalidSubject = False
 isFatalError _              = True
+
+-- | Convert a Timeout to microseconds, which is the unit for
+-- System.Timeout.timeout.
+toUSec :: Timeout -> Int
+toUSec (Sec d)  = d * 1000000
+toUSec (MSec d) = d * 1000
+toUSec (USec d) = d
+toUSec Infinity = -1
 

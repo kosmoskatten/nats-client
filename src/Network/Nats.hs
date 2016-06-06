@@ -9,6 +9,7 @@ module Network.Nats
     , JsonMsg (..)
     , NatsException (..)
     , NatsURI
+    , Timeout (..)
     , Topic
     , Payload
     , QueueGroup
@@ -27,6 +28,8 @@ module Network.Nats
     , pub'
     , pubJson
     , pubJson'
+    , request
+    , requestJSON
     , runNatsClient
 
     -- For debugging purposes the parser/writer is exported.
@@ -70,6 +73,8 @@ import Data.Conduit.Network ( AppData
                             , clientSettings
                             , runTCPClient
                             )
+import System.Random (randomRIO)
+import System.Timeout (timeout)
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -87,7 +92,9 @@ import Network.Nats.Types ( Topic
                           , NatsURI
                           , NatsException (..)
                           , ProtocolError (..)
+                          , Timeout (..)
                           , isFatalError
+                          , toUSec
                           )
 import Network.Nats.Subscriber ( NatsMsg (..)
                                , JsonMsg (..)
@@ -188,6 +195,31 @@ pubJson conn topic reply = pub conn topic reply . encode
 -- | Publish a JSON message to a Topic. Shortcut with no reply-to Topic.
 pubJson' :: ToJSON a => Connection -> Topic -> a -> IO ()
 pubJson' conn topic = pubJson conn topic Nothing
+
+-- | Convenience API to request something syncronously. The topic
+-- for the reply is randomly generated. The request function take
+-- an explicit Timeout value, as System.Timout.timout applied from
+-- outside can make the unsubscription to not happen.
+request :: Connection -> Topic -> Payload -> Timeout -> IO (Maybe NatsMsg)
+request conn topic payload tmo = do
+    replyTopic   <- randomReplyTopic
+    (sid, queue) <- subQueue' conn replyTopic
+    pub conn topic (Just replyTopic) payload
+    let tmo' = toUSec tmo
+    msg <- timeout tmo' $ nextMsg queue
+    unsub conn sid
+    return msg
+
+-- | As request, but with input and output types as JSON.
+requestJSON :: (ToJSON a, FromJSON b) 
+            => Connection -> Topic -> a -> Timeout -> IO (Maybe (JsonMsg b))
+requestJSON conn topic payload tmo = do
+    mMsg <- request conn topic (encode payload) tmo
+    case mMsg of
+        Just (NatsMsg topic' sid reply payload') ->
+            return $ Just (JsonMsg topic' sid reply (decode' payload'))
+        Nothing                                  ->
+            return Nothing
 
 -- | Run the Nats client given the settings and connection URI. Once
 -- the NatsApp has terminated its execution the connection is closed.
@@ -315,6 +347,11 @@ mkConnectMessage Settings {..} Info {..} =
             , clientVersion     = Just "0.1.0.0"
             }
 mkConnectMessage _ _ = error "Must be an Info record."
+
+randomReplyTopic :: IO Topic
+randomReplyTopic = 
+    BS.append "INBOX." <$> 
+        (BS.pack . show <$> randomRIO (0, maxBound :: Int))
 
 {-streamLogger :: Conduit BS.ByteString IO BS.ByteString
 streamLogger = 

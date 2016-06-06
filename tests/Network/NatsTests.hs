@@ -8,6 +8,7 @@ module Network.NatsTests
     , syncSubscribeSeveralMsgWithTmo
     , syncSubscribeSeveralJsonMsgWithTmo
     , unsubscribe
+    , requestOneItem
     ) where
 
 import Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
@@ -132,13 +133,26 @@ unsubscribe =
 
         unsub conn sid
         pub' conn "foo" "two"
-        result <- timeout 10000 $ nextMsg queue
+        result <- timeout 100000 $ nextMsg queue
 
         assertEqual "Shall be equal" "one" payload
         assertEqual "Shall be equal" Nothing result
 
+requestOneItem :: Assertion
+requestOneItem =
+    void $ runNatsClient settings "" $ \conn -> do
+        void $ subAsync' conn "help" $ \(NatsMsg _ _ mReply _) -> do
+            case mReply of
+                Just reply -> pub' conn reply "pong"
+                Nothing    -> return ()
+
+        Just (NatsMsg _ _ _ payload) <-
+            request conn "help" "ping" Infinity
+
+        assertEqual "Shall be equal" "pong" payload
+
 settings :: Settings
-settings = defaultSettings { verbose    = True
+settings = defaultSettings { verbose    = False
                            , pedantic   = True
                            , loggerSpec = StdoutLogger
                            }
