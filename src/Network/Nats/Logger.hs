@@ -41,10 +41,14 @@ toLogType (FileLogger path) = LogFileNoRotate path defaultBufSize
 
 inputLogger :: FastLogger -> Logger
 inputLogger logger msg = do
-    let inp = toLogStr ("< " :: String) <> toLogStr (writeMessage msg)
+    let inp = toLogStr ("<= " :: String) 
+           <> toLogStr (writeMessage msg)
+           <> toLogStr ("\r\n" :: String)
     logger inp
 
 outputLogger :: FastLogger -> Logger
 outputLogger logger msg = do
-    let outp = toLogStr ("> " :: String) <> toLogStr (writeMessage msg)
+    let outp = toLogStr ("=> " :: String) 
+            <> toLogStr (writeMessage msg)
+            <> toLogStr ("\r\n" :: String)
     logger outp
