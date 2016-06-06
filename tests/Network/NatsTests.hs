@@ -138,6 +138,7 @@ unsubscribe =
         assertEqual "Shall be equal" Nothing result
 
 settings :: Settings
-settings = defaultSettings { verbose  = True
-                           , pedantic = True
+settings = defaultSettings { verbose    = True
+                           , pedantic   = True
+                           , loggerSpec = StdoutLogger
                            }

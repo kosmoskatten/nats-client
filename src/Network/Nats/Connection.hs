@@ -8,6 +8,7 @@ import Control.Concurrent.STM (TVar, TQueue)
 import Data.ByteString (ByteString)
 import Data.Conduit.Network (AppData)
 
+import Network.Nats.Logger (LoggerSpec (..), Logger)
 import Network.Nats.Subscriber (Subscribers)
 
 -- | The context needed to maintain one NATS connection. Content is opaque
@@ -23,23 +24,34 @@ data Connection = Connection
 
     , subscribers :: !(TVar Subscribers)
       -- ^ The map of subscribers.
+
+    , inpLogger   :: Logger
+      -- ^ The logger of input messages.
+
+    , outpLogger  :: Logger
+      -- ^ The logger of output messages.
+
+    , logCleanUp  :: IO ()
+      -- ^ The logger clean up action, flushing buffers etc.
     }
 
 -- | User specified settings for a NATS connection.
 data Settings = Settings
-    { verbose  :: !Bool
+    { verbose    :: !Bool
       -- ^ Turns on +OK protocol acknowledgements.
-    , pedantic :: !Bool
+    , pedantic   :: !Bool
       -- ^ Turns on additional strict format checking, e.g.
       -- properly formed subjects.
+    , loggerSpec :: !LoggerSpec
     } deriving Show
 
 -- | Default NATS settings.
 defaultSettings :: Settings
-defaultSettings = 
+defaultSettings =
     Settings
-        { verbose  = False
-        , pedantic = False
+        { verbose    = False
+        , pedantic   = False
+        , loggerSpec = NoLogger
         }
 
 

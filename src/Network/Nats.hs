@@ -4,6 +4,7 @@
 module Network.Nats
     ( Connection
     , Settings (..)
+    , LoggerSpec (..)
     , NatsMsg (..)
     , JsonMsg (..)
     , NatsException (..)
@@ -73,6 +74,7 @@ import Network.Nats.Connection ( Connection (..)
                                , Settings (..)
                                , defaultSettings
                                )
+import Network.Nats.Logger (LoggerSpec (..), mkLoggers)
 import Network.Nats.Message (Message (..))
 import Network.Nats.Parser (parseMessage)
 import Network.Nats.Types ( Topic 
@@ -186,7 +188,7 @@ pubJson' conn topic = pubJson conn topic Nothing
 -- | Run the Nats client given the settings and connection URI. Once
 -- the NatsApp has terminated its execution the connection is closed.
 runNatsClient :: Settings -> NatsURI -> (Connection -> IO a) -> IO a
-runNatsClient settings' _uri app = do
+runNatsClient settings'@Settings {..} _uri app = do
     let tcpSettings = clientSettings 4222 "localhost"
     runTCPClient tcpSettings $ \appData' ->
         bracket (setup appData')
@@ -195,27 +197,33 @@ runNatsClient settings' _uri app = do
     where
       setup :: AppData -> IO (Connection, [ Async () ])
       setup appData' = do
-          txQueue'     <- newTQueueIO
-          subscribers' <- newTVarIO empty
+          txQueue'             <- newTQueueIO
+          subscribers'         <- newTVarIO empty
+          (inp, outp, cleanUp) <- mkLoggers loggerSpec
           let conn = Connection
                        { appData     = appData'
                        , settings    = settings'
                        , txQueue     = txQueue'
                        , subscribers = subscribers'
+                       , inpLogger   = inp
+                       , outpLogger  = outp
+                       , logCleanUp  = cleanUp
                        }
           (conn,) <$> mapM async [ transmissionPipeline conn
                                  , receptionPipeline conn
                                  ]
 
       teardown :: (Connection, [ Async () ]) -> IO ()
-      teardown (_, xs) = do
+      teardown (conn, xs) = do
           mapM_ cancel xs
           mapM_ waitCatch xs
+          logCleanUp conn
 
 -- | Serialize and enqueue a message for sending. The serialization is
 -- performed by the calling thread.
 enqueueMessage :: Connection -> Message -> IO ()
 enqueueMessage Connection {..} msg = do
+    outpLogger msg
     let chunks = LBS.toChunks $ writeMessage msg
     atomically $ mapM_ (writeTQueue txQueue) chunks
 
@@ -244,28 +252,33 @@ receptionPipeline conn = do
             
 -- | Handle the semantic actions for one received message.
 handleMessage :: Connection -> Message -> IO ()
+handleMessage conn@Connection {..} msg = do
+    inpLogger msg
+    handleMessage' conn msg
+
+handleMessage' :: Connection -> Message -> IO ()
 
 -- | Handle a Msg message. Dispatch the message to the subscriber. If
 -- there'e no subscriber the message is dropped.
-handleMessage Connection {..} (Msg topic sid reply payload) = do
+handleMessage' Connection {..} (Msg topic sid reply payload) = do
     subscribers' <- readTVarIO subscribers
     maybe (return ()) 
           (deliverSubscription $ NatsMsg topic sid reply payload)
           (lookupSubscriber sid subscribers')
 
 -- | Handle an Info message. Just produce and enqueue a Connect message.
-handleMessage conn@Connection {..} msg@Info {..} =
+handleMessage' conn@Connection {..} msg@Info {..} =
     enqueueMessage conn $ mkConnectMessage settings msg
 
 -- | Handle a Ping message. Just reply with a Pong message.
-handleMessage conn Ping = enqueueMessage conn Pong
+handleMessage' conn Ping = enqueueMessage conn Pong
 
 -- | Handle an Err message. If the error is fatal a NatsException is thrown.
-handleMessage _ (Err pe)
+handleMessage' _ (Err pe)
     | isFatalError pe = throw (NatsException pe)
     | otherwise       = return ()
 
-handleMessage _conn _msg = return ()
+handleMessage' _conn _msg = return ()
 
 -- | Deliver a message to a subscriber.
 deliverSubscription :: NatsMsg -> Subscriber -> IO ()
