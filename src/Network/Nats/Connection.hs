@@ -4,6 +4,7 @@ module Network.Nats.Connection
     , defaultSettings
     ) where
 
+import Control.Concurrent (MVar)
 import Control.Concurrent.STM (TVar, TQueue)
 import Data.ByteString (ByteString)
 import Data.Conduit.Network (AppData)
@@ -17,8 +18,16 @@ data Connection = Connection
     { appData     :: !AppData
       -- ^ Stuff gotten from the TCP client, e.g. the source and sink
       -- network conduits.
+
+    , startUpSync :: !(MVar ())
+      -- ^ After setting up the pipelines the threads must be
+      -- synchronized such that the NatsApp must wait for the Info
+      -- message to have been processed and the Connect message have
+      -- been queueed.
+
     , settings    :: !Settings
       -- ^ The user provided settings for establishing the connection.
+
     , txQueue     :: !(TQueue ByteString)
       -- ^ The queue of data (as ByteStrings) to be transmitted.
 

@@ -36,7 +36,11 @@ module Network.Nats
     , writeMessage
     ) where
 
-import Control.Concurrent (forkIO)
+import Control.Concurrent ( forkIO
+                          , newEmptyMVar
+                          , putMVar
+                          , takeMVar
+                          )
 import Control.Concurrent.Async (Async, async, cancel, waitCatch)
 import Control.Concurrent.STM ( atomically
                               , modifyTVar
@@ -191,17 +195,22 @@ runNatsClient :: Settings -> NatsURI -> (Connection -> IO a) -> IO a
 runNatsClient settings'@Settings {..} _uri app = do
     let tcpSettings = clientSettings 4222 "localhost"
     runTCPClient tcpSettings $ \appData' ->
-        bracket (setup appData')
-                teardown
-                (app . fst)
+        bracket (setup appData') teardown $ \(conn, _) -> do
+            -- Now we must wait for the Connect message to have been
+            -- added to the txQueue before letting the app
+            -- starting the execution.
+            takeMVar $ startUpSync conn
+            app conn
     where
       setup :: AppData -> IO (Connection, [ Async () ])
       setup appData' = do
+          startUpSync'         <- newEmptyMVar
           txQueue'             <- newTQueueIO
           subscribers'         <- newTVarIO empty
           (inp, outp, cleanUp) <- mkLoggers loggerSpec
           let conn = Connection
                        { appData     = appData'
+                       , startUpSync = startUpSync'
                        , settings    = settings'
                        , txQueue     = txQueue'
                        , subscribers = subscribers'
@@ -267,8 +276,12 @@ handleMessage' Connection {..} (Msg topic sid reply payload) = do
           (lookupSubscriber sid subscribers')
 
 -- | Handle an Info message. Just produce and enqueue a Connect message.
-handleMessage' conn@Connection {..} msg@Info {..} =
+handleMessage' conn@Connection {..} msg@Info {..} = do
     enqueueMessage conn $ mkConnectMessage settings msg
+
+    -- Now when the Connect message has been put on the queue, the
+    -- rest of the application can be unlocked.
+    putMVar startUpSync ()
 
 -- | Handle a Ping message. Just reply with a Pong message.
 handleMessage' conn Ping = enqueueMessage conn Pong
