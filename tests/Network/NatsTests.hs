@@ -19,6 +19,8 @@ import GHC.Generics (Generic)
 import System.Timeout (timeout)
 import Test.HUnit
 
+import qualified Data.ByteString as BS
+
 import Network.Nats
 
 data TestMsg = TestMsg
@@ -31,7 +33,7 @@ instance ToJSON TestMsg
 
 asyncSubscribeSingleMsg :: Assertion
 asyncSubscribeSingleMsg =
-    void $ runNatsClient settings "" $ \conn -> do
+    void $ runNatsClient settings defaultURI $ \conn -> do
         sync <- newEmptyMVar
         sid <- subAsync' conn "foo" $ handler sync
         pub' conn "foo" "Hello World!"
@@ -45,7 +47,7 @@ asyncSubscribeSingleMsg =
 
 asyncSubscribeSingleJsonMsg :: Assertion
 asyncSubscribeSingleJsonMsg =
-    void $ runNatsClient settings "" $ \conn -> do
+    void $ runNatsClient settings defaultURI $ \conn -> do
         sync <- newEmptyMVar
         sid <- subAsyncJson' conn "foo" $ handler sync
         let msg = TestMsg { stringField = "foo", intField = 123 }
@@ -61,7 +63,7 @@ asyncSubscribeSingleJsonMsg =
 
 syncSubscribeSingleMsg :: Assertion
 syncSubscribeSingleMsg =
-    void $ runNatsClient settings "" $ \conn -> do
+    void $ runNatsClient settings defaultURI $ \conn -> do
         (sid, queue) <- subQueue' conn "foo"
         pub' conn "foo" "Hello sync world!"
 
@@ -71,7 +73,7 @@ syncSubscribeSingleMsg =
 
 syncSubscribeSingleJsonMsg :: Assertion
 syncSubscribeSingleJsonMsg =
-    void $ runNatsClient settings "" $ \conn -> do
+    void $ runNatsClient settings defaultURI $ \conn -> do
         (sid, queue) <- subQueue' conn "foo"
         let msg = TestMsg { stringField = "foo", intField = 234 }
         pubJson' conn "foo" msg
@@ -82,7 +84,7 @@ syncSubscribeSingleJsonMsg =
 
 syncSubscribeSeveralMsgWithTmo :: Assertion
 syncSubscribeSeveralMsgWithTmo =
-    void $ runNatsClient settings "" $ \conn -> do
+    void $ runNatsClient settings defaultURI $ \conn -> do
         (_, queue) <- subQueue' conn "foo"
         pub' conn "foo" "one"
         pub' conn "foo" "two"
@@ -101,7 +103,7 @@ syncSubscribeSeveralMsgWithTmo =
 
 syncSubscribeSeveralJsonMsgWithTmo :: Assertion
 syncSubscribeSeveralJsonMsgWithTmo =
-    void $ runNatsClient settings "" $ \conn -> do
+    void $ runNatsClient settings defaultURI $ \conn -> do
         (_, queue) <- subQueue' conn "foo"
         let msg1 = TestMsg { stringField = "foo", intField = 345 }
             msg2 = TestMsg { stringField = "foo", intField = 456 }
@@ -125,7 +127,7 @@ syncSubscribeSeveralJsonMsgWithTmo =
 
 unsubscribe :: Assertion
 unsubscribe =
-    void $ runNatsClient settings "" $ \conn -> do
+    void $ runNatsClient settings defaultURI $ \conn -> do
         (sid, queue) <- subQueue' conn "foo"
 
         pub' conn "foo" "one"
@@ -140,7 +142,7 @@ unsubscribe =
 
 requestOneItem :: Assertion
 requestOneItem =
-    void $ runNatsClient settings "" $ \conn -> do
+    void $ runNatsClient settings defaultURI $ \conn -> do
         void $ subAsync' conn "help" $ \(NatsMsg _ _ mReply _) -> do
             case mReply of
                 Just reply -> pub' conn reply "pong"
@@ -156,3 +158,6 @@ settings = defaultSettings { verbose    = False
                            , pedantic   = True
                            , loggerSpec = StdoutLogger
                            }
+
+defaultURI :: BS.ByteString
+defaultURI = "nats://localhost:4222"

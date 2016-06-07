@@ -75,6 +75,7 @@ import Data.Conduit.Network ( AppData
                             )
 import System.Random (randomRIO)
 import System.Timeout (timeout)
+import URI.ByteString
 
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy.Char8 as LBS
@@ -224,8 +225,9 @@ requestJSON conn topic payload tmo = do
 -- | Run the Nats client given the settings and connection URI. Once
 -- the NatsApp has terminated its execution the connection is closed.
 runNatsClient :: Settings -> NatsURI -> (Connection -> IO a) -> IO a
-runNatsClient settings'@Settings {..} _uri app = do
-    let tcpSettings = clientSettings 4222 "localhost"
+runNatsClient settings'@Settings {..} uri app = do
+    let (host, port) = uriParams $ parseURI strictURIParserOptions uri
+        tcpSettings  = clientSettings port host
     runTCPClient tcpSettings $ \appData' ->
         bracket (setup appData') teardown $ \(conn, _) -> do
             -- Now we must wait for the Connect message to have been
@@ -259,6 +261,22 @@ runNatsClient settings'@Settings {..} _uri app = do
           mapM_ cancel xs
           mapM_ waitCatch xs
           logCleanUp conn
+
+-- | Take hostname and port from the parsed URI. It will throw
+-- URIException if, there's a parsing error, the scheme not is
+-- "nats" or if host or port fields not are available.
+uriParams :: Either URIParseError (URIRef Absolute) -> (BS.ByteString, Int)
+uriParams (Right uri) =
+    let scheme   = schemeBS $ uriScheme uri
+        uriAuth  = maybe (throw $ URIException "No authority info")
+                         id (uriAuthority uri)
+        host     = hostBS $ authorityHost uriAuth
+        port     = maybe (throw $ URIException "No port number")
+                         portNumber (authorityPort uriAuth)
+    in if scheme == "nats" then
+           (host, port)
+       else throw $ URIException "Schema must be \"nats\""
+uriParams (Left _) = throw $ URIException "URI ParseError"
 
 -- | Serialize and enqueue a message for sending. The serialization is
 -- performed by the calling thread.

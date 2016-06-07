@@ -81,7 +81,7 @@ parseMsgs = map (fromResult . parse parseMessage)
 -- The benchmark requires a running NATS server.
 pubPerf :: Int -> IO ()
 pubPerf rep =
-    runNatsClient defaultSettings "" $ \conn ->
+    runNatsClient defaultSettings defaultURI $ \conn ->
         replicateM_ rep $ pub' conn "bench" "hello"
 
 -- | Send the given number of Pub messages containing the payload "hello"
@@ -89,7 +89,7 @@ pubPerf rep =
 -- The benchmark requires a running NATS server.
 pubSubPerf :: Int -> IO ()
 pubSubPerf rep =
-    runNatsClient defaultSettings "" $ \conn -> do
+    runNatsClient defaultSettings defaultURI $ \conn -> do
         tvar <- newTVarIO 0
         void $ subAsync' conn "bench" $ receiver tvar
         replicateM_ rep $ pub' conn "bench" "hello"
@@ -159,3 +159,6 @@ replicatePayload n =
 -- | A basic "random" payload chunk with 48 characters.
 payloadChunk :: LBS.ByteString
 payloadChunk = "pq01ow92ie83ue74ur74yt65jf82nc8emr8dj48v.dksme2z"
+
+defaultURI :: BS.ByteString
+defaultURI = "nats://localhost:4222"

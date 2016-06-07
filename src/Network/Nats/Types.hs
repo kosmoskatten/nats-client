@@ -28,7 +28,9 @@ type QueueGroup = BS.ByteString
 type NatsURI = BS.ByteString
 
 -- | Exception to be thrown from the Nats client.
-data NatsException = NatsException !ProtocolError
+data NatsException 
+    = NatsException !ProtocolError
+    | URIException !String
     deriving (Typeable, Show)
 
 instance Exception NatsException
